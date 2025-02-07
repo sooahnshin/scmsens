@@ -1,6 +1,6 @@
 #' Synthetic Data with Vanilla Vertical Regression
 #'
-#' Generates synthetic data based on a vanilla vertical regression model given a set of parameters.
+#' This function generates synthetic data based on a vanilla vertical regression model given a set of parameters.
 #' This method is designed to analyze data with a specified number of pre-treatment time periods and donor units,
 #' incorporating an ATT (Average Treatment Effect on the Treated) value and parameters for non-overlap.
 #'
@@ -12,11 +12,11 @@
 #' @param beta Numeric vector, weights.
 #'
 #' @return A list containing the following elements:
-#'     - df_pre_full: A data frame of complete pre-treatment data (t0 x n+1). The last column is the observation for treated unit (Y).
-#'     - df_prepost_full: A data frame of complete pre- and post-treatment data ((t0+1) x n+1). The second to last column is the observation for treated unit (Y), and the last column is the treatment indicator (D). The last row is the post-treatment observation.
-#'     - beta: A numeric vector of weights.
-#'     - tau: A numeric value of ATT
-#'     - .call: The matched call.
+#'    - df_pre_full: A data frame of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
+#'    - df_prepost_full: A data frame of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
+#'    - beta: A numeric vector of weights.
+#'    - tau: A numeric value of ATT
+#'    - .call: The matched call.
 #'
 #' @importFrom MASS mvrnorm
 #' @importFrom stats rnorm
@@ -90,14 +90,14 @@ generate_synth_data_vertreg <- function(t0 = 99,
 
 #' Simulate Time Series from AR(l) Model with Specific Initial Values
 #'
-#' This function simulates a time series from an autoregressive model of order l (AR(l))
+#' This function simulates a time series from an autoregressive model of order \eqn{l} (AR(\eqn{l}))
 #' with specified initial values for each lag.
 #'
 #' @param phi A numeric vector of length \code{l} containing the autoregressive coefficients
 #'   for each lag. The AR(1) coefficient corresponds to \code{phi[1]}, AR(2) to \code{phi[2]},
 #'   and so on up to AR(\code{l}).
 #' @param y0 A numeric vector of length \code{l} specifying the initial values for each lag
-#'   of the time series. The value \code{y0[i]} represents the initial value for lag \code{i}.
+#'   of the time series. The value \code{y0[i]} represents the initial value for lag \eqn{i}.
 #' @param n An integer specifying the number of observations to simulate.
 #' @param sd_eps A numeric value representing the standard deviation of the innovations.
 #'   The innovations are assumed to be independent and identically distributed (iid) Gaussian white noise
@@ -135,15 +135,17 @@ simulate_ar_l_with_initial <- function(phi, y0, n, sd_eps) {
 
 #' Synthetic Data with Autoregressive Model AR(l)
 #'
+#' This function generates synthetic data based on an autoregressive model of order \eqn{l} (AR(\eqn{l})).
+#'
 #' @param t0 Numeric, the number of pre-treatment time periods (observations).
 #' @param n Numeric, the number of donor units (variables).
 #' @param tau Numeric, the value of ATT (Average Treatment Effect on the Treated).
-#' @param ar Numeric vector of length l, coefficients for AR model.
-#' @param init (n+1) by l matrix, initial values for AR model (optional).
+#' @param ar Numeric vector of length \eqn{l}, coefficients for AR model.
+#' @param init \eqn{(n+1)} by \eqn{l} matrix, initial values for AR model (optional).
 #'
 #' @return A list containing the following elements:
-#'    - df_pre_full: A data frame of complete pre-treatment data (t0 x n+1). The last column is the observation for treated unit (Y).
-#'    - df_prepost_full: A data frame of complete pre- and post-treatment data ((t0+1) x n+1). The second to last column is the observation for treated unit (Y), and the last column is the treatment indicator (D). The last row is the post-treatment observation.
+#'    - df_pre_full: A data frame of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
+#'    - df_prepost_full: A data frame of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
 #'    - tau: A numeric value of ATT
 #'    - .call: The matched call.
 #'
@@ -194,26 +196,28 @@ generate_synth_data_ar <- function(
   return(res)
 }
 
-#' Synthetic Data with Interacted Fixed Effect Model
+#' Synthetic Data with Interactive Fixed Effect Model
+#'
+#' This function generates synthetic data based on an interactive fixed effect model.
 #'
 #' @param t0 Numeric, the number of pre-treatment time periods (observations).
 #' @param n Numeric, the number of donor units (variables).
 #' @param tau Numeric, the value of ATT (Average Treatment Effect on the Treated).
-#' @param phi Numeric matrix, (n+1 x J) matrix of unit fixed effects.
-#' @param mu Numeric matrix, (J x t0+1) matrix of time fixed effects.
-#' @param alpha Numeric vector, (n+1)-length vector of unit fixed effects.
-#' @param nu Numeric vector, (t0+1)-length vector of time fixed effects.
-#' @param X Numeric array, (n+1 x t0+1 x k) k-dimensional time varying covariates (optional).
-#' @param beta Numeric vector, k-length vector of coefficients for time varying covariates.
+#' @param phi Numeric matrix, \eqn{((n+1) \times J)} matrix of unit fixed effects.
+#' @param mu Numeric matrix, \eqn{(J \times (t0+1))} matrix of time fixed effects.
+#' @param alpha Numeric vector, \eqn{(n+1)}-length vector of unit fixed effects.
+#' @param nu Numeric vector, \eqn{(t0+1)}-length vector of time fixed effects.
+#' @param X Numeric array, \eqn{((n+1) \times (t0+1) \times k)} \eqn{k}-dimensional time varying covariates (optional).
+#' @param beta Numeric vector, \eqn{k}-length vector of coefficients for time varying covariates.
 #' @param epsilon_sd Numeric, standard deviation of error term.
 #' @param J Numeric, dimension of factor (interacted fixed effects).
 #'
 #' @return A list containing the following elements:
-#'   - df_pre_full: A data frame of complete pre-treatment data (t0 x n+1). The last column is the observation for treated unit (Y).
-#'   - df_prepost_full: A data frame of complete pre- and post-treatment data ((t0+1) x n+1). The second to last column is the observation for treated unit (Y), and the last column is the treatment indicator (D). The last row is the post-treatment observation.
-#'   - tau: A numeric value of ATT
-#'   - params: A list of parameters used to generate the data.
-#'   - .call: The matched call.
+#'    - df_pre_full: A data frame of complete pre-treatment data \eqn{(t0 \times n+1)}. The last column is the observation for treated unit (\eqn{Y}).
+#'    - df_prepost_full: A data frame of complete pre- and post-treatment data \eqn{((t0+1) \times n+1)}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
+#'    - tau: A numeric value of ATT
+#'    - params: A list of parameters used to generate the data.
+#'    - .call: The matched call.
 #'
 #' @importFrom dplyr slice
 #'

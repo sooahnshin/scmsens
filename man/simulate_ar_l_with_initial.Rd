@@ -12,7 +12,7 @@ for each lag. The AR(1) coefficient corresponds to \code{phi[1]}, AR(2) to \code
 and so on up to AR(\code{l}).}
 
 \item{y0}{A numeric vector of length \code{l} specifying the initial values for each lag
-of the time series. The value \code{y0[i]} represents the initial value for lag \code{i}.}
+of the time series. The value \code{y0[i]} represents the initial value for lag \eqn{i}.}
 
 \item{n}{An integer specifying the number of observations to simulate.}
 
@@ -24,7 +24,7 @@ with mean 0 and standard deviation \code{sd_eps}.}
 A numeric vector containing the simulated time series.
 }
 \description{
-This function simulates a time series from an autoregressive model of order l (AR(l))
+This function simulates a time series from an autoregressive model of order \eqn{l} (AR(\eqn{l}))
 with specified initial values for each lag.
 }
 \examples{

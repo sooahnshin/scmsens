@@ -2,7 +2,7 @@
 % Please edit documentation in R/synthetic_data.R
 \name{generate_synth_data_ife}
 \alias{generate_synth_data_ife}
-\title{Synthetic Data with Interacted Fixed Effect Model}
+\title{Synthetic Data with Interactive Fixed Effect Model}
 \usage{
 generate_synth_data_ife(
   t0 = 99,
@@ -25,17 +25,17 @@ generate_synth_data_ife(
 
 \item{tau}{Numeric, the value of ATT (Average Treatment Effect on the Treated).}
 
-\item{phi}{Numeric matrix, (n+1 x J) matrix of unit fixed effects.}
+\item{phi}{Numeric matrix, \eqn{((n+1) \times J)} matrix of unit fixed effects.}
 
-\item{mu}{Numeric matrix, (J x t0+1) matrix of time fixed effects.}
+\item{mu}{Numeric matrix, \eqn{(J \times (t0+1))} matrix of time fixed effects.}
 
-\item{alpha}{Numeric vector, (n+1)-length vector of unit fixed effects.}
+\item{alpha}{Numeric vector, \eqn{(n+1)}-length vector of unit fixed effects.}
 
-\item{nu}{Numeric vector, (t0+1)-length vector of time fixed effects.}
+\item{nu}{Numeric vector, \eqn{(t0+1)}-length vector of time fixed effects.}
 
-\item{X}{Numeric array, (n+1 x t0+1 x k) k-dimensional time varying covariates (optional).}
+\item{X}{Numeric array, \eqn{((n+1) \times (t0+1) \times k)} \eqn{k}-dimensional time varying covariates (optional).}
 
-\item{beta}{Numeric vector, k-length vector of coefficients for time varying covariates.}
+\item{beta}{Numeric vector, \eqn{k}-length vector of coefficients for time varying covariates.}
 
 \item{epsilon_sd}{Numeric, standard deviation of error term.}
 
@@ -44,15 +44,15 @@ generate_synth_data_ife(
 \value{
 A list containing the following elements:
 \itemize{
-\item df_pre_full: A data frame of complete pre-treatment data (t0 x n+1). The last column is the observation for treated unit (Y).
-\item df_prepost_full: A data frame of complete pre- and post-treatment data ((t0+1) x n+1). The second to last column is the observation for treated unit (Y), and the last column is the treatment indicator (D). The last row is the post-treatment observation.
+\item df_pre_full: A data frame of complete pre-treatment data \eqn{(t0 \times n+1)}. The last column is the observation for treated unit (\eqn{Y}).
+\item df_prepost_full: A data frame of complete pre- and post-treatment data \eqn{((t0+1) \times n+1)}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
 \item tau: A numeric value of ATT
 \item params: A list of parameters used to generate the data.
 \item .call: The matched call.
 }
 }
 \description{
-Synthetic Data with Interacted Fixed Effect Model
+This function generates synthetic data based on an interactive fixed effect model.
 }
 \examples{
 set.seed(123)

@@ -28,14 +28,16 @@ generate_synth_data_vertreg(
 }
 \value{
 A list containing the following elements:
-- df_pre_full: A data frame of complete pre-treatment data (t0 x n+1). The last column is the observation for treated unit (Y).
-- df_prepost_full: A data frame of complete pre- and post-treatment data ((t0+1) x n+1). The second to last column is the observation for treated unit (Y), and the last column is the treatment indicator (D). The last row is the post-treatment observation.
-- beta: A numeric vector of weights.
-- tau: A numeric value of ATT
-- .call: The matched call.
+\itemize{
+\item df_pre_full: A data frame of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
+\item df_prepost_full: A data frame of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
+\item beta: A numeric vector of weights.
+\item tau: A numeric value of ATT
+\item .call: The matched call.
+}
 }
 \description{
-Generates synthetic data based on a vanilla vertical regression model given a set of parameters.
+This function generates synthetic data based on a vanilla vertical regression model given a set of parameters.
 This method is designed to analyze data with a specified number of pre-treatment time periods and donor units,
 incorporating an ATT (Average Treatment Effect on the Treated) value and parameters for non-overlap.
 }

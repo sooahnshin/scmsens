@@ -19,21 +19,21 @@ generate_synth_data_ar(
 
 \item{tau}{Numeric, the value of ATT (Average Treatment Effect on the Treated).}
 
-\item{ar}{Numeric vector of length l, coefficients for AR model.}
+\item{ar}{Numeric vector of length \eqn{l}, coefficients for AR model.}
 
-\item{init}{(n+1) by l matrix, initial values for AR model (optional).}
+\item{init}{\eqn{(n+1)} by \eqn{l} matrix, initial values for AR model (optional).}
 }
 \value{
 A list containing the following elements:
 \itemize{
-\item df_pre_full: A data frame of complete pre-treatment data (t0 x n+1). The last column is the observation for treated unit (Y).
-\item df_prepost_full: A data frame of complete pre- and post-treatment data ((t0+1) x n+1). The second to last column is the observation for treated unit (Y), and the last column is the treatment indicator (D). The last row is the post-treatment observation.
+\item df_pre_full: A data frame of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
+\item df_prepost_full: A data frame of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
 \item tau: A numeric value of ATT
 \item .call: The matched call.
 }
 }
 \description{
-Synthetic Data with Autoregressive Model AR(l)
+This function generates synthetic data based on an autoregressive model of order \eqn{l} (AR(\eqn{l})).
 }
 \examples{
 set.seed(123)
