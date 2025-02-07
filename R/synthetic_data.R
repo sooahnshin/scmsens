@@ -213,8 +213,8 @@ generate_synth_data_ar <- function(
 #' @param J Numeric, dimension of factor (interacted fixed effects).
 #'
 #' @return A list containing the following elements:
-#'    - df_pre_full: A data frame of complete pre-treatment data \eqn{(t0 \times n+1)}. The last column is the observation for treated unit (\eqn{Y}).
-#'    - df_prepost_full: A data frame of complete pre- and post-treatment data \eqn{((t0+1) \times n+1)}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
+#'    - df_pre_full: A data frame of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
+#'    - df_prepost_full: A data frame of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
 #'    - tau: A numeric value of ATT
 #'    - params: A list of parameters used to generate the data.
 #'    - .call: The matched call.
