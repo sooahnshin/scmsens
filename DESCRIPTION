@@ -1,12 +1,17 @@
 Package: scmsens
-Title: What the Package Does (One Line, Title Case)
+Title: Sensitivity Analysis Tools for Synthetic Control Method
 Version: 0.0.0.9000
-Authors@R: 
-    person("First", "Last", , "first.last@example.com", role = c("aut", "cre"),
-           comment = c(ORCID = "YOUR-ORCID-ID"))
-Description: What the package does (one paragraph).
-License: `use_mit_license()`, `use_gpl3_license()` or friends to pick a
-    license
+Authors@R: c(
+    person("Sooahn", "Shin", , "sooahnshin@g.harvard.edu", role = c("aut", "cre"),
+           comment = c(ORCID = "0000-0001-6213-2197")),
+    person("Soichiro", "Yamauchi", email = "soichiro@alumni.princeton.edu", role = c("aut")),
+    person("Naijia", "Liu", email = "naijialiu@fas.harvard.edu", role = c("aut")))
+Description: Provides sensitivity analysis tools for the Synthetic Control Method (SCM) 
+    framework to test the robustness of SCM results to potential unobserved donor units, 
+    as discussed in Liu, Shin, and Yamauchi (2024). It extends the traditional omitted 
+    variable bias framework developed by Cinelli and Hazlett (2020) <doi:10.1111/rssb.12348> 
+    for sensitivity analysis.
+License: GPL (>= 3)
 Encoding: UTF-8
 Roxygen: list(markdown = TRUE)
 RoxygenNote: 7.3.1
