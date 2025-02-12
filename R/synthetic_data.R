@@ -12,14 +12,15 @@
 #' @param beta Numeric vector, weights.
 #'
 #' @return A list containing the following elements:
-#'    - df_pre_full: A data frame of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
-#'    - df_prepost_full: A data frame of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
+#'    - df_pre_full: A tibble of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
+#'    - df_prepost_full: A tibble of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
 #'    - beta: A numeric vector of weights.
 #'    - tau: A numeric value of ATT
 #'    - .call: The matched call.
 #'
 #' @importFrom MASS mvrnorm
 #' @importFrom stats rnorm
+#' @importFrom tibble as_tibble
 #'
 #' @examples
 #' set.seed(123)
@@ -67,7 +68,7 @@ generate_synth_data_vertreg <- function(t0 = 99,
   xlab <- paste0("X", 1:n)
   colnames(X0) <- xlab
 
-  df_pre_full <- as.data.frame(cbind(X0, Y0))
+  df_pre_full <- tibble::as_tibble(cbind(X0, Y0))
   colnames(df_pre_full) <- c(xlab, "Y")
 
   df_prepost_full <- df_pre_full |>
@@ -144,8 +145,8 @@ simulate_ar_l_with_initial <- function(phi, y0, n, sd_eps) {
 #' @param init \eqn{(n+1)} by \eqn{l} matrix, initial values for AR model (optional).
 #'
 #' @return A list containing the following elements:
-#'    - df_pre_full: A data frame of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
-#'    - df_prepost_full: A data frame of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
+#'    - df_pre_full: A tibble of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
+#'    - df_prepost_full: A tibble of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
 #'    - tau: A numeric value of ATT
 #'    - .call: The matched call.
 #'
@@ -173,7 +174,7 @@ generate_synth_data_ar <- function(
   } else {
     dat <- t(replicate((n + 1), arima.sim(n = (t0 + 1), list(ar = ar), sd = 1)))
   }
-  df_pre_full <- as.data.frame(t(dat))
+  df_pre_full <- tibble::as_tibble(t(dat))
 
   # labels
   xlab <- paste0("X", 1:n)
@@ -213,8 +214,8 @@ generate_synth_data_ar <- function(
 #' @param J Numeric, dimension of factor (interacted fixed effects).
 #'
 #' @return A list containing the following elements:
-#'    - df_pre_full: A data frame of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
-#'    - df_prepost_full: A data frame of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
+#'    - df_pre_full: A tibble of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
+#'    - df_prepost_full: A tibble of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
 #'    - tau: A numeric value of ATT
 #'    - params: A list of parameters used to generate the data.
 #'    - .call: The matched call.
@@ -298,7 +299,7 @@ generate_synth_data_ife <- function(
 
   df_pre_full <- t(Y)
   colnames(df_pre_full) <- c(paste0("X", 1:n), "Y")
-  df_pre_full <- as.data.frame(df_pre_full)
+  df_pre_full <- tibble::as_tibble(df_pre_full)
 
   df_prepost_full <- df_pre_full |>
     dplyr::mutate(D = 0)

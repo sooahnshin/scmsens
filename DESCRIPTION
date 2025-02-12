@@ -19,4 +19,5 @@ URL: https://github.com/sooahnshin/scmsens
 BugReports: https://github.com/sooahnshin/scmsens/issues
 Imports: 
     dplyr,
-    MASS
+    MASS,
+    tibble
