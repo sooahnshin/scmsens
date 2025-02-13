@@ -1,0 +1,126 @@
+---
+output: github_document
+---
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.path = "man/figures/README-",
+  out.width = "100%"
+)
+```
+
+# scmsens
+
+<!-- badges: start -->
+[![R-CMD-check](https://github.com/sooahnshin/scmsens/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/sooahnshin/scmsens/actions/workflows/R-CMD-check.yaml)
+<!-- badges: end -->
+
+## Overview
+
+`scmsens` provides sensitivity analysis tools for the Synthetic Control Method (SCM) 
+framework to test the robustness of SCM results to potential unobserved donor units, 
+as discussed in [Liu, Shin, and Yamauchi (2024)](https://sooahnshin.com/SCM_Missing.pdf). 
+It extends the traditional omitted variable bias framework developed by 
+[Cinelli and Hazlett (2020)](https://doi.org/10.1111/rssb.12348)
+for sensitivity analysis.
+
+## Installation
+
+You can install the development version of scmsens from [GitHub](https://github.com/) with:
+
+``` r
+# install.packages("devtools")
+devtools::install_github("sooahnshin/scmsens")
+```
+
+## Example 1: Sensitivity Analysis with Leave-One-Out
+
+```{r loo}
+library(scmsens)
+library(dplyr)
+library(ggplot2)
+theme_set(theme_bw(base_size = 15) + theme(plot.title = element_text(hjust = 0.5)))
+
+## Synthetic data generated with interactive fixed effect model
+synth_data
+# synth_pre/synth_post are preperiod/postperiod data from this synthetic data
+
+## Leave-one-out sensitivity analysis
+# We estimate bias parameters with dropping one control unit at a time
+res <- estimate_params(var_y_name = "Y", # name of the treated unit
+                       var_x_name = paste0("X", 1:16), # names of control units
+                       data_pre = synth_pre,
+                       data_post = synth_post)
+knitr::kable(head(res) |> mutate(across(where(is.numeric), ~ round(.x, 3))))
+
+## Contour plot (SCM Estimate)
+tau_complete <- res |> pull(tau) |> unique()
+var_x_gamma <- res |> pull(gamma)
+var_x_delta <- res |> pull(delta)
+var_x_tau <- res |> pull(estimate)
+var_x_name <- paste0("Drop ", paste0("X", 1:16), " (", round(var_x_tau, 1), ")")
+plot_sensitivity(tau_complete = tau_complete,
+                 var_x_gamma = var_x_gamma, var_x_delta = var_x_delta, var_x_name = var_x_name,
+                 title = "Sensitivity of the SCM Estimate", text_size = 4)
+
+## Contour plot (R squared)
+fit <- vertreg_stacked(
+  formula = paste("Y ~ ", paste(paste0("X", 1:16), collapse = " + ")),
+  data_pre = synth_pre,
+  data_post = synth_post
+  )
+df <- fit$df # degree of freedom
+tau_se <- fit$std.error # standard error
+# plot only top 5 units for benchmark (positive bias)
+res <- res |> arrange(desc(bias)) |> head(5)
+tau_complete <- res |> pull(tau) |> unique()
+var_x_r2_Y_Z <- res |> pull(r2_Y_Z)
+var_x_r2_D_Z <- res |> pull(r2_D_Z)
+var_x_name <- paste0("Drop ", paste0("X", 1:5))
+plot_sensitivity_r2(tau_complete = tau_complete, df = df, tau_se = tau_se,
+                    sign_bias = 1,
+                    var_x_r2_Y_Z = var_x_r2_Y_Z, var_x_r2_D_Z = var_x_r2_D_Z, var_x_name = var_x_name,
+                    title = "Sensitivity of the SCM Estimate (Positive Bias)",
+                    r2_Y_Z_seq = seq(0, 0.1, length.out = 100),
+                    r2_D_Z_seq = seq(0, 0.1, length.out = 100),
+                    text_size = 5)
+
+```
+
+## Example 2: Sensitivity Analysis with Partially Observed Data
+```{r partial}
+## Suppose X1 is partially observed (only observed for odd-numbered rows)
+synth_pre_missing <- synth_pre |>
+  mutate(X1 = ifelse(row_number() %% 2 == 0, NA, X1)) 
+## Estimate parameters with partially observed data 
+df_pre_partial <- synth_pre_missing |>
+  filter(!is.na(X1))
+res <- estimate_params_partial(
+  fm_z_on_x = paste("X1 ~ ", paste(paste0("X", 2:16), collapse = " + ")),
+  fm_y_on_z_and_x = paste("Y ~ ", paste(paste0("X", 1:16), collapse = " + ")),
+  data_pre = df_pre_partial,
+  data_post = synth_post,
+  pseudo_inverse = FALSE
+  )
+res_table <- tibble(
+  Parameter = names(res),
+  Estimate = unlist(res)  # Convert list values to numeric vector
+)
+knitr::kable(res_table, digits = 3)
+
+## Contour plot (SCM Estimate)
+tau_complete <- vertreg(
+  formula = paste("Y ~ ", paste(paste0("X", 2:16), collapse = " + ")),
+  data_pre = synth_pre_missing,
+  data_post = synth_post
+  )
+plot_sensitivity(tau_complete = tau_complete,
+                 var_x_gamma = res$gamma, var_x_delta = res$delta, 
+                 var_x_name = paste0("X1 (Partially observed; ", round(tau_complete - res$bias, 1), ")"),
+                 title = "Sensitivity of the SCM Estimate", text_size = 4)
+```
+
