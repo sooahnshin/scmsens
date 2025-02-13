@@ -33,14 +33,6 @@ devtools::install_github("sooahnshin/scmsens")
 ``` r
 library(scmsens)
 library(dplyr)
-#> 
-#> Attaching package: 'dplyr'
-#> The following objects are masked from 'package:stats':
-#> 
-#>     filter, lag
-#> The following objects are masked from 'package:base':
-#> 
-#>     intersect, setdiff, setequal, union
 library(ggplot2)
 theme_set(theme_bw(base_size = 15) + theme(plot.title = element_text(hjust = 0.5)))
 
@@ -66,10 +58,10 @@ synth_data
 
 ## Leave-one-out sensitivity analysis
 # We estimate bias parameters with dropping one control unit at a time
-res <- estimate_params(var_y_name = "Y", # name of the treated unit
-                       var_x_name = paste0("X", 1:16), # names of control units
-                       data_pre = synth_pre,
-                       data_post = synth_post)
+res <- estimate_params(var_y_name  = "Y", # name of the treated unit
+                       var_x_name  = paste0("X", 1:16), # names of control units
+                       data_pre    = synth_pre,
+                       data_post   = synth_post)
 knitr::kable(head(res) |> mutate(across(where(is.numeric), ~ round(.x, 3))))
 ```
 
@@ -85,14 +77,18 @@ knitr::kable(head(res) |> mutate(across(where(is.numeric), ~ round(.x, 3))))
 ``` r
 
 ## Contour plot (SCM Estimate)
-tau_complete <- res |> pull(tau) |> unique()
-var_x_gamma <- res |> pull(gamma)
-var_x_delta <- res |> pull(delta)
-var_x_tau <- res |> pull(estimate)
-var_x_name <- paste0("Drop ", paste0("X", 1:16), " (", round(var_x_tau, 1), ")")
+tau_complete  <- res |> pull(tau) |> unique()
+var_x_gamma   <- res |> pull(gamma)
+var_x_delta   <- res |> pull(delta)
+var_x_tau     <- res |> pull(estimate)
+var_x_name    <- paste0("Drop ", paste0("X", 1:16), " (", round(var_x_tau, 1), ")")
+
 plot_sensitivity(tau_complete = tau_complete,
-                 var_x_gamma = var_x_gamma, var_x_delta = var_x_delta, var_x_name = var_x_name,
-                 title = "Sensitivity of the SCM Estimate", text_size = 4)
+                 var_x_gamma  = var_x_gamma, 
+                 var_x_delta  = var_x_delta, 
+                 var_x_name   = var_x_name,
+                 title        = "Sensitivity of the SCM Estimate", 
+                 text_size    = 4)
 ```
 
 <img src="man/figures/README-loo-1.png" width="100%" />
@@ -101,25 +97,28 @@ plot_sensitivity(tau_complete = tau_complete,
 
 ## Contour plot (R squared)
 fit <- vertreg_stacked(
-  formula = paste("Y ~ ", paste(paste0("X", 1:16), collapse = " + ")),
-  data_pre = synth_pre,
-  data_post = synth_post
-  )
-df <- fit$df # degree of freedom
-tau_se <- fit$std.error # standard error
-# plot only top 5 units for benchmark (positive bias)
-res <- res |> arrange(desc(bias)) |> head(5)
+  formula   = paste("Y ~ ", paste(paste0("X", 1:16), collapse = " + ")),
+  data_pre  = synth_pre,
+  data_post = synth_post)
+
+# Plot only top 5 units for benchmark (positive bias)
+res          <- res |> arrange(desc(bias)) |> head(5)
 tau_complete <- res |> pull(tau) |> unique()
 var_x_r2_Y_Z <- res |> pull(r2_Y_Z)
 var_x_r2_D_Z <- res |> pull(r2_D_Z)
-var_x_name <- paste0("Drop ", paste0("X", 1:5))
-plot_sensitivity_r2(tau_complete = tau_complete, df = df, tau_se = tau_se,
-                    sign_bias = 1,
-                    var_x_r2_Y_Z = var_x_r2_Y_Z, var_x_r2_D_Z = var_x_r2_D_Z, var_x_name = var_x_name,
-                    title = "Sensitivity of the SCM Estimate (Positive Bias)",
-                    r2_Y_Z_seq = seq(0, 0.1, length.out = 100),
-                    r2_D_Z_seq = seq(0, 0.1, length.out = 100),
-                    text_size = 5)
+var_x_name   <- paste0("Drop ", paste0("X", 1:5))
+
+plot_sensitivity_r2(tau_complete = tau_complete, 
+                    df           = fit$df, 
+                    tau_se       = fit$std.error,
+                    sign_bias    = 1,
+                    var_x_r2_Y_Z = var_x_r2_Y_Z, 
+                    var_x_r2_D_Z = var_x_r2_D_Z, 
+                    var_x_name   = var_x_name,
+                    title        = "Sensitivity of the SCM Estimate (Positive Bias)",
+                    r2_Y_Z_seq   = seq(0, 0.1, length.out = 100),
+                    r2_D_Z_seq   = seq(0, 0.1, length.out = 100),
+                    text_size    = 5)
 ```
 
 <img src="man/figures/README-loo-2.png" width="100%" />
@@ -130,19 +129,27 @@ plot_sensitivity_r2(tau_complete = tau_complete, df = df, tau_se = tau_se,
 ## Suppose X1 is partially observed (only observed for second half)
 synth_pre_missing <- synth_pre |>
   mutate(X1 = ifelse(row_number() < n()/2, NA, X1)) 
-## Estimate parameters with partially observed data 
-df_pre_partial <- synth_pre_missing |>
-  filter(!is.na(X1))
-res <- estimate_params_partial(
-  fm_z_on_x = paste("X1 ~ ", paste(paste0("X", 2:16), collapse = " + ")),
-  fm_y_on_z_and_x = paste("Y ~ ", paste(paste0("X", 1:16), collapse = " + ")),
-  data_pre = df_pre_partial,
-  data_post = synth_post,
-  pseudo_inverse = FALSE
+
+## Complete case analysis 
+tau_complete <- vertreg(
+  formula   = paste("Y ~ ", paste(paste0("X", 2:16), collapse = " + ")),
+  data_pre  = synth_pre_missing,
+  data_post = synth_post
   )
+
+## Estimate parameters with partially observed data 
+df_pre_partial <- synth_pre_missing |> filter(!is.na(X1))
+res <- estimate_params_partial(
+  fm_z_on_x       = paste("X1 ~ ", paste(paste0("X", 2:16), collapse = " + ")),
+  fm_y_on_z_and_x = paste("Y ~ ", paste(paste0("X", 1:16), collapse = " + ")),
+  data_pre        = df_pre_partial,
+  data_post       = synth_post,
+  pseudo_inverse  = FALSE
+  )
+
 res_table <- tibble(
   Parameter = names(res),
-  Estimate = unlist(res)  # Convert list values to numeric vector
+  Estimate  = unlist(res)  # Convert list values to numeric vector
 )
 knitr::kable(res_table, digits = 3)
 ```
@@ -156,15 +163,10 @@ knitr::kable(res_table, digits = 3)
 ``` r
 
 ## Contour plot (SCM Estimate)
-tau_complete <- vertreg(
-  formula = paste("Y ~ ", paste(paste0("X", 2:16), collapse = " + ")),
-  data_pre = synth_pre_missing,
-  data_post = synth_post
-  )
 plot_sensitivity(tau_complete = tau_complete,
-                 var_x_gamma = res$gamma, var_x_delta = res$delta, 
-                 var_x_name = paste0("X1 (Partially observed; ", round(tau_complete - res$bias, 1), ")"),
-                 title = "Sensitivity of the SCM Estimate", text_size = 4)
+                 var_x_gamma  = res$gamma, var_x_delta = res$delta, 
+                 var_x_name   = paste0("X1 (Partially observed; ", round(tau_complete - res$bias, 1), ")"),
+                 title        = "Sensitivity of the SCM Estimate", text_size = 4)
 ```
 
 <img src="man/figures/README-partial-1.png" width="100%" />
