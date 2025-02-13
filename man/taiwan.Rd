@@ -7,9 +7,9 @@
 \format{
 A tibble with 21 rows and 77 columns, where the columns include the following:
 \itemize{
-\item year: A numeric vector of year
-\item Dt: A numeric vector of treatment indicator
-\item Taiwan: A numeric vector of outcome for Taiwan
+\item \code{year}: A numeric vector of year
+\item \code{Dt}: A numeric vector of treatment indicator
+\item \code{Taiwan}: A numeric vector of outcome for Taiwan
 \item The rest of the columns are numeric vectors of outcome for control units
 }
 }

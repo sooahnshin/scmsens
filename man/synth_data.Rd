@@ -8,10 +8,10 @@
 A tibble with 100 rows and 19 columns
 where \eqn{t0 = 99}, \eqn{n = 16}, and the true ATT is \eqn{0}:
 \itemize{
-\item year: A numeric vector of year
-\item Dt: A numeric vector of treatment indicator
-\item Y: A numeric vector of outcome for West Germany
-\item X1 to X16: Numeric vectors of outcome for control units
+\item \code{year}: A numeric vector of year
+\item \code{Dt}: A numeric vector of treatment indicator
+\item \code{Y}: A numeric vector of outcome for West Germany
+\item \code{X1} to \code{X16}: Numeric vectors of outcome for control units
 }
 }
 \usage{

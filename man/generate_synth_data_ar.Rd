@@ -26,10 +26,10 @@ generate_synth_data_ar(
 \value{
 A list containing the following elements:
 \itemize{
-\item df_pre_full: A tibble of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
-\item df_prepost_full: A tibble of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
-\item tau: A numeric value of ATT
-\item .call: The matched call.
+\item \code{df_pre_full}: A tibble of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
+\item \code{df_prepost_full}: A tibble of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
+\item \code{tau}: A numeric value of ATT
+\item \code{.call}: The matched call.
 }
 }
 \description{

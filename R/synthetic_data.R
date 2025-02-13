@@ -12,11 +12,11 @@
 #' @param beta Numeric vector, weights.
 #'
 #' @return A list containing the following elements:
-#'    - df_pre_full: A tibble of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
-#'    - df_prepost_full: A tibble of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
-#'    - beta: A numeric vector of weights.
-#'    - tau: A numeric value of ATT
-#'    - .call: The matched call.
+#'    - `df_pre_full`: A tibble of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
+#'    - `df_prepost_full`: A tibble of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
+#'    - `beta`: A numeric vector of weights.
+#'    - `tau`: A numeric value of ATT
+#'    - `.call`: The matched call.
 #'
 #' @importFrom MASS mvrnorm
 #' @importFrom stats rnorm
@@ -145,10 +145,10 @@ simulate_ar_l_with_initial <- function(phi, y0, n, sd_eps) {
 #' @param init \eqn{(n+1)} by \eqn{l} matrix, initial values for AR model (optional).
 #'
 #' @return A list containing the following elements:
-#'    - df_pre_full: A tibble of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
-#'    - df_prepost_full: A tibble of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
-#'    - tau: A numeric value of ATT
-#'    - .call: The matched call.
+#'    - `df_pre_full`: A tibble of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
+#'    - `df_prepost_full`: A tibble of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
+#'    - `tau`: A numeric value of ATT
+#'    - `.call`: The matched call.
 #'
 #' @examples
 #' set.seed(123)
@@ -214,11 +214,11 @@ generate_synth_data_ar <- function(
 #' @param J Numeric, dimension of factor (interacted fixed effects).
 #'
 #' @return A list containing the following elements:
-#'    - df_pre_full: A tibble of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
-#'    - df_prepost_full: A tibble of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
-#'    - tau: A numeric value of ATT
-#'    - params: A list of parameters used to generate the data.
-#'    - .call: The matched call.
+#'    - `df_pre_full`: A tibble of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
+#'    - `df_prepost_full`: A tibble of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
+#'    - `tau`: A numeric value of ATT
+#'    - `params`: A list of parameters used to generate the data.
+#'    - `.call`: The matched call.
 #'
 #' @importFrom dplyr slice
 #'
