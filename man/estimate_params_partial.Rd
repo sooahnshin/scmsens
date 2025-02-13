@@ -19,9 +19,9 @@ format (e.g., "Z ~ X1 + X2").}
 \item{fm_y_on_z_and_x}{A string specifying the vertical regression with
 missing obs in the formula format (e.g, "Y ~ X1 + X2 + Z").}
 
-\item{data_pre}{Pre-period data where the rows are time points and the columns include treated/control units.}
+\item{data_pre}{Pre-period data where the rows are time points and the columns include treated/control units. See \code{synth_pre} for example.}
 
-\item{data_post}{Post-period data. Should have identical columns to data_pre.}
+\item{data_post}{Post-period data. Should have identical columns to data_pre. See \code{synth_post} for example.}
 
 \item{pseudo_inverse}{A logical to indicate whether to use the pseudo-inverse to fit the model.}
 }
@@ -32,26 +32,19 @@ A list of \code{gamma}, \code{imbalance}, and \code{bias}.
 Function to use partially observed data to estimate gamma and imbalance.
 }
 \examples{
-df_pre_full <- synth_data |>
-  dplyr::filter(Dt == 0) |>
-  dplyr::select(-year, -Dt)
-df_post_full <- synth_data |>
-  dplyr::filter(Dt == 1) |>
-  dplyr::select(-year, -Dt)
 # Suppose X1 is partially observed
-df_pre_full <- df_pre_full |>
-  dplyr::mutate(X1 = ifelse(rep(c(FALSE, TRUE), length.out = dplyr::n()), NA, X1))
-df_pre_partial <- df_pre_full |>
- dplyr::filter(!is.na(X1))
-fm_z_on_x <- as.formula(
-  paste("X1 ~ -1 + ", paste(paste0("X", 2:16), collapse = " + "))
-)
-fm_y_on_z_and_x <- as.formula(
- paste("Y ~ -1 + ", paste(paste0("X", 1:16), collapse = " + "))
- )
-estimate_params_partial(fm_z_on_x = fm_z_on_x,
-                       fm_y_on_z_and_x = fm_y_on_z_and_x,
-                       data_pre = df_pre_partial,
-                       data_post = df_post_full,
-                       pseudo_inverse = FALSE)
+synth_pre_partial <- synth_pre |>
+  dplyr::mutate(X1 = ifelse(rep(c(FALSE, TRUE), length.out = dplyr::n()), NA, X1)) |>
+  dplyr::filter(!is.na(X1))
+estimate_params_partial(fm_z_on_x = paste("X1 ~ -1 + ",
+                          paste(paste0("X", 2:16), collapse = " + ")),
+                        fm_y_on_z_and_x = paste("Y ~ -1 + ",
+                          paste(paste0("X", 1:16), collapse = " + ")),
+                        data_pre = synth_pre_partial,
+                        data_post = synth_post,
+                        pseudo_inverse = FALSE)
+
+}
+\seealso{
+\code{\link[=estimate_params]{estimate_params()}}
 }

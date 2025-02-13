@@ -20,7 +20,10 @@ BugReports: https://github.com/sooahnshin/scmsens/issues
 Imports: 
     broom,
     dplyr,
+    ggplot2,
+    ggrepel,
     MASS,
+    metR,
     purrr,
     sensemakr,
     tibble

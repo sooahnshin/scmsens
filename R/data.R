@@ -9,9 +9,27 @@
 #' where \eqn{t0 = 99}, \eqn{n = 16}, and the true ATT is \eqn{0}:
 #'   - `year`: A numeric vector of year
 #'   - `Dt`: A numeric vector of treatment indicator
-#'   - `Y`: A numeric vector of outcome for West Germany
+#'   - `Y`: A numeric vector of outcome for treated unit
 #'   - `X1` to `X16`: Numeric vectors of outcome for control units
 "synth_data"
+
+#' Synthetic Preperiod Data
+#'
+#' A wide-format panel data set of synthetic preperiod data.
+#'
+#' @format A tibble with 99 rows and 17 columns, where the columns include the following:
+#'   - `Y`: A numeric vector of outcome for treated unit
+#'   - `X1` to `X16`: Numeric vectors of outcome for control units
+"synth_pre"
+
+#' Synthetic Postperiod Data
+#'
+#' A wide-format panel data set of synthetic postperiod data.
+#'
+#' @format A tibble with 1 row and 17 columns, where the columns include the following:
+#'  - `Y`: A numeric vector of outcome for treated unit
+#'  - `X1` to `X16`: Numeric vectors of outcome for control units
+"synth_post"
 
 #' West German Reunification Data (Abadie, Diamond, and Hainmueller 2015)
 #'

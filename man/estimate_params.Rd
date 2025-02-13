@@ -17,9 +17,9 @@ estimate_params(
 
 \item{var_x_name}{Names of the control units.}
 
-\item{data_pre}{Pre-period data where the rows are time points and the columns include treated/control units.}
+\item{data_pre}{Pre-period data where the rows are time points and the columns include treated/control units. See \code{synth_pre} for example.}
 
-\item{data_post}{Post-period data. Should have identical columns to data_pre.}
+\item{data_post}{Post-period data. Should have identical columns to data_pre. See \code{synth_post} for example.}
 
 \item{pseudo_inverse}{A logical to indicate whether to use the pseudo-inverse to fit the model.}
 }
@@ -47,19 +47,13 @@ A data.frame with the following columns:
 Function to estimate bias parameters with dropping one control unit at a time
 }
 \examples{
-df_pre_full <- synth_data |>
-  dplyr::filter(Dt == 0) |>
-  dplyr::select(-year, -Dt)
-df_post_full <- synth_data |>
-  dplyr::filter(Dt == 1) |>
-  dplyr::select(-year, -Dt)
-formula_full <- as.formula(
-  paste("Y ~ -1 + ", paste(paste0("X", 1:16), collapse = " + "))
-)
 estimate_params(var_y_name = "Y",
                var_x_name = paste0("X", 1:16),
-               data_pre = df_pre_full,
-               data_post = df_post_full,
+               data_pre = synth_pre,
+               data_post = synth_post,
                pseudo_inverse = FALSE)
 
+}
+\seealso{
+\code{\link[=estimate_params_partial]{estimate_params_partial()}}
 }

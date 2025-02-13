@@ -92,4 +92,13 @@ synth_data <- synth_ife$df_prepost_full |>
   relocate(year, D, Y) |>
   rename(Dt = D)
 
+synth_pre <- synth_data |>
+  filter(Dt == 0) |>
+  select(-year, -Dt)
+synth_post <- synth_data |>
+  filter(Dt == 1) |>
+  select(-year, -Dt)
+
 usethis::use_data(synth_data, overwrite = TRUE)
+usethis::use_data(synth_pre, overwrite = TRUE)
+usethis::use_data(synth_post, overwrite = TRUE)
