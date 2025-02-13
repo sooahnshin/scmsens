@@ -1,0 +1,11 @@
+bibentry(
+  bibtype  = "Article",
+  title    = "Synthetic Control Method with Missing Pre-treatment Outcomes",
+  author   = c(person("Naijia", "Liu"), person("Sooahn", "Shin"), person("Soichiro", "Yamauchi")),
+  journal  = "Working Paper",
+  year     = 2024,
+  volume   = "",
+  number   = "",
+  pages    = "",
+  doi      = ""
+)
