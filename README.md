@@ -127,9 +127,9 @@ plot_sensitivity_r2(tau_complete = tau_complete, df = df, tau_se = tau_se,
 ## Example 2: Sensitivity Analysis with Partially Observed Data
 
 ``` r
-## Suppose X1 is partially observed (only observed for odd-numbered rows)
+## Suppose X1 is partially observed (only observed for second half)
 synth_pre_missing <- synth_pre |>
-  mutate(X1 = ifelse(row_number() %% 2 == 0, NA, X1)) 
+  mutate(X1 = ifelse(row_number() < n()/2, NA, X1)) 
 ## Estimate parameters with partially observed data 
 df_pre_partial <- synth_pre_missing |>
   filter(!is.na(X1))
@@ -149,9 +149,9 @@ knitr::kable(res_table, digits = 3)
 
 | Parameter | Estimate |
 |:----------|---------:|
-| gamma     |   -0.273 |
-| delta     |   -3.375 |
-| bias      |    0.923 |
+| gamma     |    0.061 |
+| delta     |   -2.527 |
+| bias      |   -0.154 |
 
 ``` r
 

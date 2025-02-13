@@ -134,13 +134,14 @@ estimate_params <- function(var_y_name,
 #' @return A list of `gamma`, `imbalance`, and `bias`.
 #'
 #' @importFrom stats coef
+#' @importFrom dplyr row_number
 #'
 #' @export
 #'
 #' @examples
 #' # Suppose X1 is partially observed
 #' synth_pre_partial <- synth_pre |>
-#'   dplyr::mutate(X1 = ifelse(rep(c(FALSE, TRUE), length.out = dplyr::n()), NA, X1)) |>
+#'   dplyr::mutate(X1 = ifelse(dplyr::row_number() < dplyr::n()/2, NA, X1)) |>
 #'   dplyr::filter(!is.na(X1))
 #' estimate_params_partial(fm_z_on_x = paste("X1 ~ -1 + ",
 #'                           paste(paste0("X", 2:16), collapse = " + ")),
