@@ -70,15 +70,15 @@ predict.lm_pseudo <- function(object, newdata, ...) {
 #' Retrieves the estimated coefficients from an `lm_pseudo` object.
 #'
 #' @param object An object of class `lm_pseudo`.
+#' @param ... Additional arguments (ignored, for consistency with generic `coef()`).
 #' @return A named numeric vector of estimated coefficients.
 #' @export
-#'
-#' @seealso [lm_pseudo()], [summary.lm_pseudo()], [predict.lm_pseudo()], [tidy.lm_pseudo()]
-coef.lm_pseudo <- function(object) {
+coef.lm_pseudo <- function(object, ...) {
   beta <- object$summary$estimate
   names(beta) <- object$summary$term
   return(beta)
 }
+
 
 #' Tidy Method for lm_pseudo Objects
 #'

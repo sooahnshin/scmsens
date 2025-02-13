@@ -4,17 +4,16 @@
 \alias{coef.lm_pseudo}
 \title{Extract Coefficients from lm_pseudo Objects}
 \usage{
-\method{coef}{lm_pseudo}(object)
+\method{coef}{lm_pseudo}(object, ...)
 }
 \arguments{
 \item{object}{An object of class \code{lm_pseudo}.}
+
+\item{...}{Additional arguments (ignored, for consistency with generic \code{coef()}).}
 }
 \value{
 A named numeric vector of estimated coefficients.
 }
 \description{
 Retrieves the estimated coefficients from an \code{lm_pseudo} object.
-}
-\seealso{
-\code{\link[=lm_pseudo]{lm_pseudo()}}, \code{\link[=summary.lm_pseudo]{summary.lm_pseudo()}}, \code{\link[=predict.lm_pseudo]{predict.lm_pseudo()}}, \code{\link[=tidy.lm_pseudo]{tidy.lm_pseudo()}}
 }

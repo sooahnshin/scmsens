@@ -43,7 +43,7 @@ vertreg <- function(formula, data_pre, data_post, pseudo_inverse = FALSE) {
   fm <- update(fm, . ~ . - 1)
 
   # fit the vertical regression
-  if (pseudo_inverse) {
+  if (isTRUE(pseudo_inverse)) {
     fit <- lm_pseudo(fm, data_pre)
   } else {
     fit <- lm(fm, data = data_pre)
@@ -119,7 +119,7 @@ vertreg_stacked <- function(formula, data_pre, data_post, pseudo_inverse = FALSE
     update(. ~ . - 1 + D)
 
   # fit the vertical regression for each post treatment period
-  if (pseudo_inverse) {
+  if (isTRUE(pseudo_inverse)) {
     # for computing the number of control units
     X <- model.matrix(fm, data_prepost)
     res <- purrr::map(1:nrow(data_post), ~ {
