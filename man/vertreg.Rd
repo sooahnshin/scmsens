@@ -4,7 +4,7 @@
 \alias{vertreg}
 \title{Vertical Regression}
 \usage{
-vertreg(formula, data_pre, data_post)
+vertreg(formula, data_pre, data_post, pseudo_inverse = FALSE)
 }
 \arguments{
 \item{formula}{A string to specify the vertical regression model (e.g., "Y ~ X1 + X2" where "Y" is treated unit, "X1" and "X2" are control units).}
@@ -12,6 +12,8 @@ vertreg(formula, data_pre, data_post)
 \item{data_pre}{Pre-period data where the rows are time points and the columns include treated/control units.}
 
 \item{data_post}{Post-period data. Should have identical columns to data_pre.}
+
+\item{pseudo_inverse}{A logical to indicate whether to use the pseudo-inverse to fit the model.}
 }
 \value{
 A vector of treatment effects.
@@ -35,4 +37,7 @@ vertreg(
   data_post = df_post_full
 )
 
+}
+\seealso{
+\code{\link[=vertreg_stacked]{vertreg_stacked()}}
 }

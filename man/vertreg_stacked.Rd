@@ -4,7 +4,7 @@
 \alias{vertreg_stacked}
 \title{Vertical Regression (With Treatment Indicator)}
 \usage{
-vertreg_stacked(formula, data_pre, data_post)
+vertreg_stacked(formula, data_pre, data_post, pseudo_inverse = FALSE)
 }
 \arguments{
 \item{formula}{A string to specify the vertical regression model (e.g., "Y ~ X1 + X2" where "Y" is treated unit, "X1" and "X2" are control units).}
@@ -12,6 +12,8 @@ vertreg_stacked(formula, data_pre, data_post)
 \item{data_pre}{Pre-period data where the rows are time points and the columns include treated/control units.}
 
 \item{data_post}{Post-period data. Should have identical columns to data_pre.}
+
+\item{pseudo_inverse}{A logical to indicate whether to use the pseudo-inverse to fit the model.}
 }
 \value{
 A data.frame with the treatment effect and its standard error based on the vertical regression:
@@ -23,6 +25,8 @@ A data.frame with the treatment effect and its standard error based on the verti
 \item \code{p.value}: the p-value of the estimated treatment effect
 \item \code{df}: the degree of freedom of the regression
 }
+
+@seealso \code{\link[=vertreg]{vertreg()}}
 }
 \description{
 Function to run a vertical regression in stacked form with a treatment indicator.
