@@ -11,6 +11,8 @@
 #' @importFrom tibble tibble
 #'
 #' @export
+#'
+#' @seealso [summary.lm_pseudo()], [predict.lm_pseudo()], [coef.lm_pseudo()], [tidy.lm_pseudo()]
 lm_pseudo <- function(formula, data) {
   X <- model.matrix(formula, data)
   y <- model.response(model.frame(formula, data))
@@ -39,6 +41,8 @@ lm_pseudo <- function(formula, data) {
 #' @param ... Additional arguments (ignored).
 #' @return A tibble containing the estimated coefficients with their corresponding terms.
 #' @export
+#'
+#' @seealso [lm_pseudo()], [predict.lm_pseudo()], [coef.lm_pseudo()], [tidy.lm_pseudo()]
 summary.lm_pseudo <- function(object, ...) {
   return(object$summary)
 }
@@ -53,6 +57,8 @@ summary.lm_pseudo <- function(object, ...) {
 #' @return A numeric vector of predicted values.
 #' @importFrom stats model.matrix
 #' @export
+#'
+#' @seealso [lm_pseudo()], [summary.lm_pseudo()], [coef.lm_pseudo()], [tidy.lm_pseudo()]
 predict.lm_pseudo <- function(object, newdata, ...) {
   X <- model.matrix(object$formula, newdata)
   y_hat <- X %*% object$summary$estimate
@@ -66,6 +72,8 @@ predict.lm_pseudo <- function(object, newdata, ...) {
 #' @param object An object of class `lm_pseudo`.
 #' @return A named numeric vector of estimated coefficients.
 #' @export
+#'
+#' @seealso [lm_pseudo()], [summary.lm_pseudo()], [predict.lm_pseudo()], [tidy.lm_pseudo()]
 coef.lm_pseudo <- function(object) {
   beta <- object$summary$estimate
   names(beta) <- object$summary$term
@@ -80,6 +88,8 @@ coef.lm_pseudo <- function(object) {
 #' @importFrom stats model.matrix model.response model.frame pt
 #' @importFrom tibble tibble
 #' @export
+#'
+#' @seealso [lm_pseudo()], [summary.lm_pseudo()], [predict.lm_pseudo()], [coef.lm_pseudo()]
 tidy.lm_pseudo <- function(x, ...) {
   X <- model.matrix(x$formula, x$data)
   y <- model.response(model.frame(x$formula, x$data))
@@ -93,9 +103,10 @@ tidy.lm_pseudo <- function(x, ...) {
   # Estimate residual standard error
   sigma_sq <- sum(residuals^2) / (n - p)
 
-  # Compute variance-covariance matrix
-  X_pinv <- MASS::ginv(X)
-  cov_matrix <- sigma_sq * (X_pinv %*% t(X_pinv))
+  # Compute variance-covariance matrix using SVD (more stable)
+  svd_X <- svd(X)
+  X_pinv_svd <- svd_X$v %*% diag(1 / svd_X$d, length(svd_X$d)) %*% t(svd_X$u)  # Stable pseudo-inverse
+  cov_matrix <- sigma_sq * (X_pinv_svd %*% t(X_pinv_svd))
 
   # Extract standard errors
   std_error <- sqrt(diag(cov_matrix))

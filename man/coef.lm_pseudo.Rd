@@ -15,3 +15,6 @@ A named numeric vector of estimated coefficients.
 \description{
 Retrieves the estimated coefficients from an \code{lm_pseudo} object.
 }
+\seealso{
+\code{\link[=lm_pseudo]{lm_pseudo()}}, \code{\link[=summary.lm_pseudo]{summary.lm_pseudo()}}, \code{\link[=predict.lm_pseudo]{predict.lm_pseudo()}}, \code{\link[=tidy.lm_pseudo]{tidy.lm_pseudo()}}
+}

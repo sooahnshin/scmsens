@@ -17,3 +17,6 @@ A tibble with columns: term, estimate, std.error, statistic, p.value.
 \description{
 Tidy Method for lm_pseudo Objects
 }
+\seealso{
+\code{\link[=lm_pseudo]{lm_pseudo()}}, \code{\link[=summary.lm_pseudo]{summary.lm_pseudo()}}, \code{\link[=predict.lm_pseudo]{predict.lm_pseudo()}}, \code{\link[=coef.lm_pseudo]{coef.lm_pseudo()}}
+}

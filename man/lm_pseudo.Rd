@@ -17,3 +17,6 @@ A list containing the estimated coefficients.
 \description{
 Function to fit linear models using the pseudo-inverse.
 }
+\seealso{
+\code{\link[=summary.lm_pseudo]{summary.lm_pseudo()}}, \code{\link[=predict.lm_pseudo]{predict.lm_pseudo()}}, \code{\link[=coef.lm_pseudo]{coef.lm_pseudo()}}, \code{\link[=tidy.lm_pseudo]{tidy.lm_pseudo()}}
+}

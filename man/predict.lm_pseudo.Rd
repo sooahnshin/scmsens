@@ -19,3 +19,6 @@ A numeric vector of predicted values.
 \description{
 Generates predictions from an \code{lm_pseudo} object using new data.
 }
+\seealso{
+\code{\link[=lm_pseudo]{lm_pseudo()}}, \code{\link[=summary.lm_pseudo]{summary.lm_pseudo()}}, \code{\link[=coef.lm_pseudo]{coef.lm_pseudo()}}, \code{\link[=tidy.lm_pseudo]{tidy.lm_pseudo()}}
+}
