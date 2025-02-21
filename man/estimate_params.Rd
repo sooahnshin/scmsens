@@ -47,13 +47,15 @@ A data.frame with the following columns:
 Function to estimate bias parameters with dropping one control unit at a time
 }
 \examples{
-estimate_params(var_y_name = "Y",
-               var_x_name = paste0("X", 1:16),
-               data_pre = synth_pre,
-               data_post = synth_post,
-               pseudo_inverse = FALSE)
+estimate_params(
+  var_y_name = "Y",
+  var_x_name = paste0("X", 1:16),
+  data_pre = synth_pre,
+  data_post = synth_post,
+  pseudo_inverse = FALSE
+)
 
 }
 \seealso{
-\code{\link[=estimate_params_partial]{estimate_params_partial()}}
+\code{\link[=estimate_params_partial]{estimate_params_partial()}}, \code{\link[=estimate_params_partial_multi]{estimate_params_partial_multi()}}
 }

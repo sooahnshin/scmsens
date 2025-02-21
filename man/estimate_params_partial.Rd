@@ -2,7 +2,7 @@
 % Please edit documentation in R/estimate_params.R
 \name{estimate_params_partial}
 \alias{estimate_params_partial}
-\title{Estimate Sensitivity Parameters}
+\title{Estimate Sensitivity Parameters with A Single Control Unit with Partially Observed Data}
 \usage{
 estimate_params_partial(
   fm_z_on_x,
@@ -29,22 +29,30 @@ missing obs in the formula format (e.g, "Y ~ X1 + X2 + Z").}
 A list of \code{gamma}, \code{imbalance}, and \code{bias}.
 }
 \description{
-Function to use partially observed data to estimate gamma and imbalance.
+Function to use partially observed data to estimate gamma and imbalance,
+in case of a single control unit with missing observations.
+See \code{\link[=estimate_params_partial_multi]{estimate_params_partial_multi()}} for multiple control units.
 }
 \examples{
 # Suppose X1 is partially observed
 synth_pre_partial <- synth_pre |>
-  dplyr::mutate(X1 = ifelse(dplyr::row_number() < dplyr::n()/2, NA, X1)) |>
+  dplyr::mutate(X1 = ifelse(dplyr::row_number() < dplyr::n() / 2, NA, X1)) |>
   dplyr::filter(!is.na(X1))
-estimate_params_partial(fm_z_on_x = paste("X1 ~ -1 + ",
-                          paste(paste0("X", 2:16), collapse = " + ")),
-                        fm_y_on_z_and_x = paste("Y ~ -1 + ",
-                          paste(paste0("X", 1:16), collapse = " + ")),
-                        data_pre = synth_pre_partial,
-                        data_post = synth_post,
-                        pseudo_inverse = FALSE)
+estimate_params_partial(
+  fm_z_on_x = paste(
+    "X1 ~ -1 + ",
+    paste(paste0("X", 2:16), collapse = " + ")
+  ),
+  fm_y_on_z_and_x = paste(
+    "Y ~ -1 + ",
+    paste(paste0("X", 1:16), collapse = " + ")
+  ),
+  data_pre = synth_pre_partial,
+  data_post = synth_post,
+  pseudo_inverse = FALSE
+)
 
 }
 \seealso{
-\code{\link[=estimate_params]{estimate_params()}}
+\code{\link[=estimate_params]{estimate_params()}}, \code{\link[=estimate_params_partial_multi]{estimate_params_partial_multi()}}
 }

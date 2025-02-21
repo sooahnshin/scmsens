@@ -1,0 +1,170 @@
+---
+title: "simulation_study"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{simulation_study}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+```
+
+# Introduction
+
+In this vignette, we conduct a simulation study to evaluate bias in different approaches to the synthetic control method with missing outcomes. Our primary goal is to compare the root mean squared error of causal estimates across the following methods:
+
+- **Complete observations**: Vertical regression using all available data.
+- **Complete `gsynth`**: Interactive fixed effects (IFE) model estimation by [Xu (2017)](https://doi.org/10.1017/pan.2016.2) using all the available data.
+- **Unit-wise deletion**: Excluding a unit with missing outcomes.
+- **Mean imputation**: Imputing missing values with the sample mean of the partially observed outcomes for the excluded unit.
+- **Median imputation**: Imputing missing values with the sample median of the partially observed outcomes for the excluded unit.
+- **Bias correction**: Applying the proposed bias decomposition to the observed portion of the outcome data.
+
+We generate simulated data using a linear factor model and the West German reunification dataset. For further details, see Appendix B of the [paper](https://sooahnshin.com/SCM_Missing.pdf).
+
+```{r setup}
+library(scmsens)
+library(gsynth)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(ggplot2)
+library(ggrepel)
+library(splines)
+theme_set(theme_bw(base_size = 15) + theme(plot.title = element_text(hjust = 0.5)))
+```
+
+# Tutorial
+
+A single simulation run is organized as follows:
+
+1. Fit the IFE model using the West German reunification dataset.
+1. Generate synthetic data based on the estimated parameters with augmentation.
+1. Introduce missing outcomes for a unit to simulate missing data.
+1. Apply the specified methods to estimate the causal effect and assess bias.
+
+## 1. Fit the IFE model
+
+We fit the IFE model using the West German reunification dataset.
+
+```{r ife_model}
+data("wgermany")
+# Create a long format dataset
+wgermany_long <- wgermany |>
+  pivot_longer(cols = !(year|Dt), names_to = "country", values_to = "gdp") |>
+  mutate(treat = if_else(year >= 1990 & country == "West Germany", 1, 0))
+# Fit gsynth
+set.seed(123)
+gsynth_fit <- gsynth(gdp ~ treat,
+    data = wgermany_long,
+    index = c("country", "year"),
+    force = "none", # we don't add additional unit or time fixed effects
+    # A cross-validation procedure is provided (when CV = TRUE)
+    # to select the number of unobserved factors within the interval of r = c(0,2).
+    CV = TRUE, r = c(0, 2),
+    se = TRUE, inference = "parametric", nboots = 1000,
+    parallel = FALSE
+)
+# Check the estimated factors
+# plot(gsynth_fit, type = "factors", xlab = "Year")
+
+# Save estimated factors and loadings (using potential outcome Y(0))
+wgerm_factor <- gsynth_fit$factor
+wgerm_loading_co <- gsynth_fit$lambda.co
+wgerm_loading_tr <- gsynth_fit$lambda.tr
+wgerm_loading <- rbind(wgerm_loading_co, wgerm_loading_tr) |>
+  as.data.frame()
+
+# Check: plot loadings
+wgerm_loading %>%
+    mutate(unit = rownames(.)) |>
+    mutate(treat = if_else(unit == "West Germany", "Treated", "Control")) |>
+    ggplot(aes(x = r1, y = r2, color = treat)) +
+    scale_color_manual(
+        name = "Group", labels = c("Control", "Treated"),
+        values = c("black", "indianred")
+    ) +
+    theme(legend.position = "none") +
+    geom_point() +
+    geom_label_repel(
+        aes(label = unit),
+        box.padding = 0.35, # Padding around the label
+        point.padding = 0.5, # Avoids overlapping of point and label
+        segment.color = 'grey50' # Color of the line connecting point and label
+    ) +
+    labs(title = "Factor Loadings", x = "Factor 1", y = "Factor 2")
+```
+
+To generate synthetic data with longer periods, we augment the estimated factors using a spline model and stochastic noise.
+
+```{r augment_factors}
+# The estimated factors
+factor_df <- data.frame(
+    time = 1:nrow(wgerm_factor),
+    factor1 = wgerm_factor[, 1],
+    factor2 = wgerm_factor[, 2]
+)
+# Fit spline model for the augmentation
+mod_factor1 <- lm(factor1 ~ bs(time, df = 5), data = factor_df)
+mod_factor2 <- lm(factor2 ~ bs(time, df = 6), data = factor_df)
+# We will be augmenting the factors in each pre-/post-period
+pre_time <- -c(rev(seq(0, floor((99 - nrow(wgerm_factor)) * (3 / 4)))))
+post_time <- seq(nrow(wgerm_factor) + 1, length = round((99 - nrow(wgerm_factor)) / 4))
+# Augment the factors
+aug_factor1 <- predict(mod_factor1, newdata = data.frame(time = c(pre_time, post_time)))
+aug_factor2 <- predict(mod_factor2, newdata = data.frame(time = c(pre_time, post_time)))
+# Add stochastic noise
+set.seed(123)
+aug_factor1 <- aug_factor1 + rnorm(length(aug_factor1), 0, 100)
+aug_factor2 <- aug_factor2 + rnorm(length(aug_factor2), 0, 100)
+# Combine the augmented factors with the original estimated factors
+aug_factor_df <- rbind(
+    factor_df,
+    data.frame(
+        time = c(pre_time, post_time),
+        factor1 = aug_factor1,
+        factor2 = aug_factor2
+    )
+)
+aug_factor_df <- arrange(aug_factor_df, time)
+# Check: plot factors
+aug_factor_df |>
+    pivot_longer(-time, names_to = "factors", values_to = "value") |>
+    mutate(factors = str_remove(factors, "factor")) |>
+    mutate(time = time - min(time) + 1) |>
+    ggplot(aes(x = time, y = value, color = factors)) +
+    geom_rect(aes(xmin = length(pre_time) + 1, xmax = length(pre_time) + nrow(wgerm_factor), ymin = -Inf, ymax = Inf),
+              fill = "grey90", color = NA, alpha = 0.03) +
+    geom_line() +
+    labs(title = "Factors", x = "Time", y = "Value") +
+    scale_color_brewer(NULL, type = "qual", palette = "Set1") +
+    theme(legend.position = "none") 
+```
+
+## 2. Generate synthetic data
+
+Now, we generate synthetic data based on the estimated parameters with augmentation.
+We assume that the treatment effect for West Germany, the treated unit, is zero.
+
+```{r generate_synthetic_data}
+# Setup
+tau_true <- 0 # treatment effect for West Germany
+n_control <- (nrow(wgerm_loading) - 1) # number of control units
+t0 <- (nrow(aug_factor_df) - 1) # the length of pre-treatment period
+# Generate data using fitted model (using all countries)
+set.seed(1)
+synth_ife_data <- generate_synth_data_ife(
+    t0 = t0,
+    n = n_control,
+    tau = tau_true,
+    phi = wgerm_loading |> as.matrix(),
+    mu = rbind(aug_factor_df$factor1, aug_factor_df$factor2)
+)
+```
+
+## 3. Introduce missing outcomes

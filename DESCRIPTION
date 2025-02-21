@@ -26,7 +26,15 @@ Imports:
     metR,
     purrr,
     sensemakr,
-    tibble
+    tibble,
+    tidyselect
 Depends: 
     R (>= 2.10)
 LazyData: true
+Suggests: 
+    knitr,
+    rmarkdown,
+    gsynth,
+    tidyr,
+    stringr
+VignetteBuilder: knitr
