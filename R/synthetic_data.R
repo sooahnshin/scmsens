@@ -68,8 +68,7 @@ generate_synth_data_vertreg <- function(t0 = 99,
   xlab <- paste0("X", 1:n)
   colnames(X0) <- xlab
 
-  df_pre_full <- tibble::as_tibble(cbind(X0, Y0))
-  colnames(df_pre_full) <- c(xlab, "Y")
+  df_pre_full <- tibble::as_tibble(cbind(X0, Y0), .name_repair = ~{c(xlab, "Y")})
 
   df_prepost_full <- df_pre_full |>
     dplyr::mutate(D = 0)
@@ -174,11 +173,9 @@ generate_synth_data_ar <- function(
   } else {
     dat <- t(replicate((n + 1), arima.sim(n = (t0 + 1), list(ar = ar), sd = 1)))
   }
-  df_pre_full <- tibble::as_tibble(t(dat))
-
   # labels
   xlab <- paste0("X", 1:n)
-  colnames(df_pre_full) <- c(xlab, "Y")
+  df_pre_full <- tibble::as_tibble(t(dat), .name_repair = ~{c(xlab, "Y")})
 
   df_prepost_full <- df_pre_full |>
     dplyr::mutate(D = 0)
@@ -299,7 +296,7 @@ generate_synth_data_ife <- function(
 
   df_pre_full <- t(Y)
   colnames(df_pre_full) <- c(paste0("X", 1:n), "Y")
-  df_pre_full <- tibble::as_tibble(df_pre_full)
+  df_pre_full <- tibble::as_tibble(df_pre_full, .name_repair = "check_unique")
 
   df_prepost_full <- df_pre_full |>
     dplyr::mutate(D = 0)
