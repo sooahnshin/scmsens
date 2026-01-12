@@ -1,30 +1,54 @@
-#' Synthetic Data with Vanilla Vertical Regression
+#' Generate Synthetic Data with Vertical Regression Model
 #'
-#' This function generates synthetic data based on a vanilla vertical regression model given a set of parameters.
-#' This method is designed to analyze data with a specified number of pre-treatment time periods and donor units,
-#' incorporating an ATT (Average Treatment Effect on the Treated) value and parameters for non-overlap.
+#' Generate synthetic panel data using a basic vertical regression model for
+#' simulation studies. The data generation process creates correlated control units
+#' with specified mean differences, which can be used to test sensitivity analysis
+#' methods under controlled conditions.
 #'
-#' @param t0 Numeric, the number of pre-treatment time periods (observations).
-#' @param n Numeric, the number of donor units (variables).
-#' @param tau Numeric, the value of ATT (Average Treatment Effect on the Treated).
-#' @param rho Numeric, a parameter for non-overlap.
-#' @param mu Numeric, another parameter for non-overlap.
-#' @param beta Numeric vector, weights.
+#' The model generates outcomes as: \eqn{Y = X \beta + \epsilon}, where \eqn{X} are
+#' the control units drawn from a multivariate normal distribution.
+#'
+#' @param t0 Integer specifying the number of pre-treatment time periods.
+#'   Default is 99.
+#' @param n Integer specifying the number of control (donor) units. Default is 20.
+#' @param tau Numeric value specifying the true Average Treatment Effect on the
+#'   Treated (ATT). Default is 10.
+#' @param rho Numeric parameter controlling the correlation among donor units.
+#'   Larger values create stronger correlations. Default is 0.04.
+#' @param mu Numeric vector of length \code{n} specifying the mean values for each
+#'   donor unit. If \code{NULL} (default), randomly generated from N(0, 2).
+#' @param beta Numeric vector of length \code{n} specifying the true weights (coefficients)
+#'   for each donor unit. If \code{NULL} (default), randomly generated from N(0, 2).
 #'
 #' @return A list containing the following elements:
-#'    - `df_pre_full`: A tibble of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
-#'    - `df_prepost_full`: A tibble of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
-#'    - `beta`: A numeric vector of weights.
-#'    - `tau`: A numeric value of ATT
-#'    - `.call`: The matched call.
+#' \describe{
+#'   \item{df_pre_full}{A tibble of dimension (t0 x (n+1)) containing the pre-treatment
+#'     data. Columns X1, X2, ..., Xn are the control units, and Y is the treated unit.}
+#'   \item{df_prepost_full}{A tibble of dimension ((t0+1) x (n+2)) containing both
+#'     pre- and post-treatment data. Includes a treatment indicator column D.
+#'     The last row is the post-treatment observation.}
+#'   \item{beta}{The numeric vector of weights used in data generation.}
+#'   \item{tau}{The true ATT value.}
+#'   \item{.call}{The matched call used to create this object.}
+#' }
 #'
 #' @importFrom MASS mvrnorm
 #' @importFrom stats rnorm
 #' @importFrom tibble as_tibble
 #'
 #' @examples
+#' # Generate synthetic data
 #' set.seed(123)
-#' synth <- generate_synth_data_vertreg(t0 = 99, n = 20, tau = 10, rho = 0.04, mu = NULL, beta = NULL)
+#' synth <- generate_synth_data_vertreg(t0 = 99, n = 20, tau = 10, rho = 0.04)
+#'
+#' # Access the pre-treatment data
+#' head(synth$df_pre_full)
+#'
+#' # The true effect is stored in the output
+#' synth$tau
+#'
+#' @seealso \code{\link{generate_synth_data_ar}} for AR model-based data,
+#'   \code{\link{generate_synth_data_ife}} for interactive fixed effects model
 #'
 #' @export
 
@@ -133,31 +157,54 @@ simulate_ar_l_with_initial <- function(phi, y0, n, sd_eps) {
 }
 
 
-#' Synthetic Data with Autoregressive Model AR(l)
+#' Generate Synthetic Data with Autoregressive Model
 #'
-#' This function generates synthetic data based on an autoregressive model of order \eqn{l} (AR(\eqn{l})).
+#' Generate synthetic panel data where all units (treated and controls) follow an
+#' autoregressive process of order l. This is useful for simulation studies where
+#' temporal dynamics are important.
 #'
-#' @param t0 Numeric, the number of pre-treatment time periods (observations).
-#' @param n Numeric, the number of donor units (variables).
-#' @param tau Numeric, the value of ATT (Average Treatment Effect on the Treated).
-#' @param ar Numeric vector of length \eqn{l}, coefficients for AR model.
-#' @param init \eqn{(n+1)} by \eqn{l} matrix, initial values for AR model (optional).
+#' Each unit is generated independently from an AR(l) process with the same
+#' coefficients but potentially different initial values.
+#'
+#' @param t0 Integer specifying the number of pre-treatment time periods.
+#'   Default is 99.
+#' @param n Integer specifying the number of control (donor) units. Default is 20.
+#' @param tau Numeric value specifying the true Average Treatment Effect on the
+#'   Treated (ATT). This is added to the treated unit's outcome in the post-treatment
+#'   period. Default is 10.
+#' @param ar Numeric vector of AR coefficients. The length determines the order of
+#'   the AR process. Default is \code{c(0.7, 0.2, -0.1, -0.3)} for an AR(4) process.
+#' @param init Optional matrix of dimension (n+1) x length(ar) specifying initial
+#'   values for each unit. If \code{NULL} (default), random initial values are used.
 #'
 #' @return A list containing the following elements:
-#'    - `df_pre_full`: A tibble of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
-#'    - `df_prepost_full`: A tibble of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
-#'    - `tau`: A numeric value of ATT
-#'    - `.call`: The matched call.
+#' \describe{
+#'   \item{df_pre_full}{A tibble of dimension (t0 x (n+1)) containing the pre-treatment
+#'     data. Columns X1, X2, ..., Xn are the control units, and Y is the treated unit.}
+#'   \item{df_prepost_full}{A tibble of dimension ((t0+1) x (n+2)) containing both
+#'     pre- and post-treatment data. Includes a treatment indicator column D.
+#'     The last row is the post-treatment observation.}
+#'   \item{tau}{The true ATT value.}
+#'   \item{.call}{The matched call used to create this object.}
+#' }
 #'
 #' @examples
+#' # Generate AR(4) synthetic data
 #' set.seed(123)
-#' synth <- generate_synth_data_ar(t0 = 99, n = 20, tau = 10, ar = c(0.7, 0.2, -0.1, -0.3))
+#' synth <- generate_synth_data_ar(t0 = 99, n = 20, tau = 10)
+#'
+#' # Access the data
+#' head(synth$df_pre_full)
+#'
+#' # Use with custom AR coefficients
+#' synth_ar2 <- generate_synth_data_ar(t0 = 50, n = 10, tau = 5, ar = c(0.5, 0.3))
 #'
 #' @importFrom stats arima.sim
 #' @importFrom dplyr mutate
 #'
 #' @export
-#' @seealso [simulate_ar_l_with_initial()]
+#' @seealso \code{\link{simulate_ar_l_with_initial}} for simulating individual AR series,
+#'   \code{\link{generate_synth_data_vertreg}}, \code{\link{generate_synth_data_ife}}
 generate_synth_data_ar <- function(
     t0 = 99,
     n = 20,
@@ -194,46 +241,75 @@ generate_synth_data_ar <- function(
   return(res)
 }
 
-#' Synthetic Data with Interactive Fixed Effect Model
+#' Generate Synthetic Data with Interactive Fixed Effects Model
 #'
-#' This function generates synthetic data based on an interactive fixed effect model.
+#' Generate synthetic panel data using an interactive fixed effects (IFE) model,
+#' which is commonly used in synthetic control applications. The IFE model allows
+#' for unit-specific factor loadings interacting with time-varying factors.
 #'
-#' @param t0 Numeric, the number of pre-treatment time periods (observations).
-#' @param n Numeric, the number of donor units (variables).
-#' @param tau Numeric, the value of ATT (Average Treatment Effect on the Treated).
-#' @param phi Numeric matrix, \eqn{((n+1) \times J)} matrix of unit fixed effects.
-#' @param mu Numeric matrix, \eqn{(J \times (t0+1))} matrix of time fixed effects.
-#' @param alpha Numeric vector, \eqn{(n+1)}-length vector of unit fixed effects.
-#' @param nu Numeric vector, \eqn{(t0+1)}-length vector of time fixed effects.
-#' @param X Numeric array, \eqn{((n+1) \times (t0+1) \times k)} \eqn{k}-dimensional time varying covariates (optional).
-#' @param beta Numeric vector, \eqn{k}-length vector of coefficients for time varying covariates.
-#' @param epsilon_sd Numeric, standard deviation of error term.
-#' @param J Numeric, dimension of factor (interacted fixed effects).
+#' The model generates outcomes as:
+#' \deqn{Y_{it} = X_{it}'\beta + \alpha_i + \nu_t + \phi_i'\mu_t + \epsilon_{it}}
 #'
-#' @return A list containing the following elements:
-#'    - `df_pre_full`: A tibble of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
-#'    - `df_prepost_full`: A tibble of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
-#'    - `tau`: A numeric value of ATT
-#'    - `params`: A list of parameters used to generate the data.
-#'    - `.call`: The matched call.
+#' where \eqn{\phi_i} are unit-specific factor loadings and \eqn{\mu_t} are
+#' time-varying factors.
+#'
+#' @param t0 Integer specifying the number of pre-treatment time periods.
+#'   Default is 99.
+#' @param n Integer specifying the number of control (donor) units. Default is 20.
+#' @param tau Numeric value specifying the true Average Treatment Effect on the
+#'   Treated (ATT). Default is 10.
+#' @param phi Optional matrix of dimension ((n+1) x J) containing unit-specific
+#'   factor loadings. If \code{NULL}, generated randomly from N(0, 1).
+#' @param mu Optional matrix of dimension (J x (t0+1)) containing time-varying
+#'   factors. If \code{NULL}, generated randomly from N(0, 1).
+#' @param alpha Optional vector of length (n+1) containing additive unit fixed effects.
+#'   If \code{NULL} (default), set to zero.
+#' @param nu Optional vector of length (t0+1) containing additive time fixed effects.
+#'   If \code{NULL} (default), set to zero.
+#' @param X Optional array of dimension ((n+1) x (t0+1) x k) containing time-varying
+#'   covariates. If \code{NULL} (default), no covariates are included.
+#' @param beta Optional vector of length k containing coefficients for time-varying
+#'   covariates. If \code{NULL} (default), generated randomly from N(0, 1).
+#' @param epsilon_sd Numeric value specifying the standard deviation of the
+#'   error term. Default is 1.
+#' @param J Integer specifying the number of factors (dimension of interactive
+#'   fixed effects). Required if \code{phi} and \code{mu} are not provided.
+#'
+#' @return A list of class \code{"synth_ife"} containing:
+#' \describe{
+#'   \item{df_pre_full}{A tibble of dimension (t0 x (n+1)) containing the pre-treatment
+#'     data. Columns X1, X2, ..., Xn are the control units, and Y is the treated unit.}
+#'   \item{df_prepost_full}{A tibble of dimension ((t0+1) x (n+2)) containing both
+#'     pre- and post-treatment data. Includes a treatment indicator column D.}
+#'   \item{tau}{The true ATT value.}
+#'   \item{params}{A list containing the parameters used for data generation:
+#'     alpha, nu, phi, mu, beta, and epsilon.}
+#'   \item{.call}{The matched call used to create this object.}
+#' }
 #'
 #' @importFrom dplyr slice
 #'
 #' @examples
+#' # Generate IFE synthetic data with 2 factors
 #' set.seed(123)
-#' synth <- generate_synth_data_ife(
-#'   t0 = 99,
-#'   n = 20,
-#'   tau = 10,
-#'   phi = NULL,
-#'   mu = NULL,
-#'   alpha = NULL,
-#'   nu = NULL,
-#'   X = NULL,
-#'   beta = NULL,
-#'   epsilon_sd = 1,
-#'   J = 2
+#' synth <- generate_synth_data_ife(t0 = 99, n = 20, tau = 10, J = 2)
+#'
+#' # Access the generated data
+#' head(synth$df_pre_full)
+#'
+#' # Access the parameters used for generation
+#' dim(synth$params$phi)  # Factor loadings
+#' dim(synth$params$mu)   # Time factors
+#'
+#' # Generate with custom factor loadings
+#' custom_phi <- matrix(rnorm(42), ncol = 2)  # 21 units x 2 factors
+#' custom_mu <- matrix(rnorm(200), nrow = 2)  # 2 factors x 100 time periods
+#' synth_custom <- generate_synth_data_ife(
+#'   t0 = 99, n = 20, tau = 5,
+#'   phi = custom_phi, mu = custom_mu
 #' )
+#'
+#' @seealso \code{\link{generate_synth_data_vertreg}}, \code{\link{generate_synth_data_ar}}
 #'
 #' @export
 generate_synth_data_ife <- function(
@@ -249,10 +325,12 @@ generate_synth_data_ife <- function(
     epsilon_sd = 1,
     J = NULL) {
   if (is.null(phi) & is.null(J)) {
-    stop("Either phi or J should be specified.")
+    stop("Either 'phi' (factor loadings matrix) or 'J' (number of factors) must be specified.",
+         call. = FALSE)
   }
   if (is.null(mu) & is.null(J)) {
-    stop("Either mu or J should be specified.")
+    stop("Either 'mu' (time factors matrix) or 'J' (number of factors) must be specified.",
+         call. = FALSE)
   }
   if (!is.null(phi)) {
     J <- ncol(phi)
