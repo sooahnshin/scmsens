@@ -1,27 +1,69 @@
-#' Vertical Regression
+#' Vertical Regression for Synthetic Control
 #'
-#' Function to run a vertical regression.
+#' Run a vertical regression to estimate treatment effects in the Synthetic Control
+#' Method framework. This function fits a regression of the treated unit's outcomes
+#' on the control units' outcomes in the pre-treatment period, then uses the fitted
+#' model to predict the counterfactual outcome in the post-treatment period.
 #'
-#' @param formula A string to specify the vertical regression model (e.g., "Y ~ X1 + X2" where "Y" is treated unit, "X1" and "X2" are control units).
-#' @param data_pre Pre-period data where the rows are time points and the columns include treated/control units. See `synth_pre` for example.
-#' @param data_post Post-period data. Should have identical columns to data_pre. See `synth_post` for example.
-#' @param pseudo_inverse A logical to indicate whether to use the pseudo-inverse to fit the model.
-#' @return A vector of treatment effects.
+#' The treatment effect is calculated as the difference between the observed
+#' outcome and the predicted counterfactual outcome.
 #'
-#' @seealso [vertreg_stacked()]
+#' @param formula A character string or formula object specifying the vertical
+#'   regression model. The left-hand side should be the treated unit and the
+#'   right-hand side should include all control units. For example,
+#'   \code{"Y ~ X1 + X2 + X3"} or \code{"Y ~ -1 + X1 + X2 + X3"} (without intercept).
+#'   The intercept is automatically removed regardless of the formula specification.
+#' @param data_pre A data.frame, tibble, or matrix containing the pre-treatment period data.
+#'   Rows represent time points and columns represent units. Must contain all
+#'   variables specified in the formula. See \code{\link{synth_pre}} for an example.
+#' @param data_post A data.frame, tibble, or matrix containing the post-treatment period data.
+#'   Must have the same column structure as \code{data_pre}. Can contain one or more
+#'   post-treatment time periods. See \code{\link{synth_post}} for an example.
+#' @param pseudo_inverse Logical indicating whether to use the Moore-Penrose pseudo-inverse
+#'   to fit the regression model. Set to \code{TRUE} when dealing with collinear or
+#'   near-collinear control units. Default is \code{FALSE}.
+#'
+#' @return A numeric vector of estimated treatment effects, one for each post-treatment
+#'   time period (row in \code{data_post}).
+#'
+#' @seealso \code{\link{vertreg_stacked}} for inference with standard errors,
+#'   \code{\link{estimate_params}} for sensitivity analysis
 #'
 #' @importFrom stats as.formula lm predict update
 #' @importFrom tibble is_tibble
 #'
 #' @examples
+#' # Basic usage with synthetic data
 #' vertreg(
 #'   formula = paste("Y ~ -1 + ", paste(paste0("X", 1:16), collapse = " + ")),
 #'   data_pre = synth_pre,
 #'   data_post = synth_post
 #' )
 #'
+#' # With pseudo-inverse for potentially collinear data
+#' vertreg(
+#'   formula = "Y ~ X1 + X2 + X3",
+#'   data_pre = synth_pre,
+#'   data_post = synth_post,
+#'   pseudo_inverse = TRUE
+#' )
+#'
 #' @export
 vertreg <- function(formula, data_pre, data_post, pseudo_inverse = FALSE) {
+  # Input validation
+  if (is.null(formula) || (!is.character(formula) && !inherits(formula, "formula"))) {
+    stop("'formula' must be a character string or formula object.",
+         call. = FALSE)
+  }
+  if (is.null(data_pre) || (nrow(data_pre) < 1)) {
+    stop("'data_pre' must be a non-empty data.frame, tibble, or matrix.",
+         call. = FALSE)
+  }
+  if (is.null(data_post) || (nrow(data_post) < 1)) {
+    stop("'data_post' must be a non-empty data.frame, tibble, or matrix.",
+         call. = FALSE)
+  }
+  
   if (is.matrix(data_pre) | is_tibble(data_pre)) {
     data_pre <- as.data.frame(data_pre)
   }
@@ -52,37 +94,80 @@ vertreg <- function(formula, data_pre, data_post, pseudo_inverse = FALSE) {
   return(tau)
 }
 
-#' Vertical Regression (With Treatment Indicator)
+#' Stacked Vertical Regression with Inference
 #'
-#' Function to run a vertical regression in stacked form with a treatment indicator.
+#' Run a vertical regression in stacked form with a treatment indicator to obtain
+#' treatment effect estimates with standard errors. This function combines pre-treatment
+#' and post-treatment data, adds a treatment indicator, and fits the regression to
+#' enable statistical inference.
 #'
-#' @param formula A string to specify the vertical regression model (e.g., "Y ~ X1 + X2" where "Y" is treated unit, "X1" and "X2" are control units).
-#' @param data_pre Pre-period data where the rows are time points and the columns include treated/control units. See `synth_pre` for example.
-#' @param data_post Post-period data. Should have identical columns to data_pre. See `synth_post` for example.
-#' @param pseudo_inverse A logical to indicate whether to use the pseudo-inverse to fit the model.
-#' @return A data.frame with the treatment effect and its standard error based on the vertical regression:
-#'  - `time_from_treatment`: the time from the treatment
-#'  - `estimate`: the estimated treatment effect
-#'  - `std.error`: the standard error of the estimated treatment effect
-#'  - `statistic`: the t-statistic of the estimated treatment effect
-#'  - `p.value`: the p-value of the estimated treatment effect
-#'  - `df`: the degree of freedom of the regression
+#' This is the recommended function when you need standard errors and p-values
+#' for your treatment effect estimates.
 #'
-#'  @seealso [vertreg()]
+#' @param formula A character string or formula object specifying the vertical
+#'   regression model. The left-hand side should be the treated unit and the
+#'   right-hand side should include all control units. For example,
+#'   \code{"Y ~ X1 + X2 + X3"}. The treatment indicator (D) is automatically added.
+#' @param data_pre A data.frame, tibble, or matrix containing the pre-treatment period data.
+#'   Rows represent time points and columns represent units. Must contain all
+#'   variables specified in the formula. See \code{\link{synth_pre}} for an example.
+#' @param data_post A data.frame, tibble, or matrix containing the post-treatment period data.
+#'   Must have the same column structure as \code{data_pre}. Can contain one or more
+#'   post-treatment time periods. See \code{\link{synth_post}} for an example.
+#' @param pseudo_inverse Logical indicating whether to use the Moore-Penrose pseudo-inverse
+#'   to fit the regression model. Default is \code{FALSE}.
+#'
+#' @return A data.frame (tibble) with the following columns:
+#' \describe{
+#'   \item{time_from_treatment}{Integer indicating the post-treatment period (1, 2, 3, ...)}
+#'   \item{estimate}{The estimated treatment effect for that period}
+#'   \item{std.error}{Standard error of the treatment effect estimate}
+#'   \item{statistic}{The t-statistic for testing if the effect differs from zero}
+#'   \item{p.value}{Two-sided p-value for the t-test}
+#'   \item{df}{Degrees of freedom used in the regression}
+#' }
+#'
+#' @seealso \code{\link{vertreg}} for estimates without standard errors,
+#'   \code{\link{estimate_params}} for sensitivity analysis
 #'
 #' @importFrom dplyr bind_rows filter mutate relocate select n
 #' @importFrom purrr map
 #' @importFrom broom tidy
 #'
 #' @examples
+#' # Basic usage
 #' vertreg_stacked(
 #'   formula = paste("Y ~ -1 + ", paste(paste0("X", 1:16), collapse = " + ")),
 #'   data_pre = synth_pre,
 #'   data_post = synth_post
 #' )
 #'
+#' # Access specific results
+#' result <- vertreg_stacked(
+#'   formula = "Y ~ X1 + X2 + X3 + X4",
+#'   data_pre = synth_pre,
+#'   data_post = synth_post
+#' )
+#' result$estimate    # Treatment effect
+#' result$std.error   # Standard error
+#' result$p.value     # P-value
+#'
 #' @export
 vertreg_stacked <- function(formula, data_pre, data_post, pseudo_inverse = FALSE) {
+  # Input validation
+  if (is.null(formula) || (!is.character(formula) && !inherits(formula, "formula"))) {
+    stop("'formula' must be a character string or formula object.",
+         call. = FALSE)
+  }
+  if (is.null(data_pre) || (nrow(data_pre) < 1)) {
+    stop("'data_pre' must be a non-empty data.frame, tibble, or matrix.",
+         call. = FALSE)
+  }
+  if (is.null(data_post) || (nrow(data_post) < 1)) {
+    stop("'data_post' must be a non-empty data.frame, tibble, or matrix.",
+         call. = FALSE)
+  }
+  
   if (is.matrix(data_pre) | is_tibble(data_pre)) {
     data_pre <- as.data.frame(data_pre)
   }

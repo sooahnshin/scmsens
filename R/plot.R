@@ -1,22 +1,42 @@
-#' Sensitivity Contour Plot
+#' Sensitivity Contour Plot (Weight and Imbalance)
 #'
-#' Generate a sensitivity contour plot with the estimated treatment effect, weights, and imbalance.
+#' Generate a contour plot to visualize how the treatment effect estimate changes
+#' based on the weight (gamma) and imbalance (delta) parameters of potential
+#' unobserved donor units. This is a key visualization for sensitivity analysis
+#' in the Synthetic Control Method framework.
 #'
-#' @param tau_complete Estimated treatment effect with the entire data.
-#' @param var_x_gamma Weights of the control units.
-#' @param var_x_delta Imbalance of the control units.
-#' @param var_x_name Names of the control units.
-#' @param title Title of the plot
-#' @param gamma_seq Sequence of gamma values to plot.
-#' @param delta_seq Sequence of delta values to plot.
-#' @param text_size Size of the text
-#' @param nudge_x Nudge value for the x-axis text
-#' @param nudge_y Nudge value for the y-axis text
-#' @param repel Whether to use `ggrepel::geom_text_repel()` for text labels.
-#' @param tau_round Number of decimal places to round the treatment effect.
-#' @param nudge_x2 Nudge value for the x-axis text of the treatment effect.
-#' @param nudge_y2 Nudge value for the y-axis text of the treatment effect.
-#' @return ggplot2 object
+#' The contour lines show combinations of weight and imbalance that would result
+#' in the same adjusted treatment effect. Points representing dropped control units
+#' (from leave-one-out analysis) are plotted to show their contribution to potential bias.
+#'
+#' @param tau_complete Numeric value of the estimated treatment effect using
+#'   all control units (the unadjusted estimate).
+#' @param var_x_gamma Numeric vector of weights (gamma) for each control unit or
+#'   benchmark point. These typically come from leave-one-out analysis via
+#'   \code{\link{estimate_params}}.
+#' @param var_x_delta Numeric vector of imbalances (delta) for each control unit or
+#'   benchmark point. Same length as \code{var_x_gamma}.
+#' @param var_x_name Character vector of labels for each point. Same length as
+#'   \code{var_x_gamma}. Often includes the effect estimate, e.g.,
+#'   \code{"Drop X1 (-2.3)"}.
+#' @param title Character string for the plot title. Default is \code{NULL} (no title).
+#' @param gamma_seq Numeric vector specifying the range of gamma values for the
+#'   contour lines. If \code{NULL} (default), automatically determined from data.
+#' @param delta_seq Numeric vector specifying the range of delta values for the
+#'   contour lines. If \code{NULL} (default), automatically determined from data.
+#' @param text_size Numeric value for the size of text labels. Default is 3.
+#' @param nudge_x Numeric value for horizontal offset of text labels. Default is 0.02.
+#' @param nudge_y Numeric value for vertical offset of text labels. Default is 0.
+#' @param repel Logical indicating whether to use \code{ggrepel::geom_text_repel()}
+#'   for automatic label positioning to avoid overlaps. Default is \code{FALSE}.
+#' @param tau_round Integer specifying the number of decimal places for rounding
+#'   the treatment effect in the legend. Default is 1.
+#' @param nudge_x2 Numeric value for horizontal offset of the unadjusted estimate label.
+#'   If \code{NULL} (default), uses \code{nudge_x}.
+#' @param nudge_y2 Numeric value for vertical offset of the unadjusted estimate label.
+#'   If \code{NULL} (default), uses \code{nudge_y}.
+#'
+#' @return A ggplot2 object that can be further customized or printed.
 #'
 #' @import ggplot2
 #' @importFrom ggrepel geom_text_repel
@@ -24,26 +44,57 @@
 #' @export
 #'
 #' @examples
-#' # leave-one-out sensitivity analysis
+#' # Perform leave-one-out sensitivity analysis
 #' res <- estimate_params(var_y_name = "Y",
 #'                        var_x_name = paste0("X", 1:16),
 #'                        data_pre = synth_pre,
 #'                        data_post = synth_post)
+#'
+#' # Extract parameters for plotting
 #' tau_complete <- res |> dplyr::pull(tau) |> unique()
 #' var_x_gamma <- res |> dplyr::pull(gamma)
 #' var_x_delta <- res |> dplyr::pull(delta)
 #' var_x_tau <- res |> dplyr::pull(estimate)
 #' var_x_name <- paste0("Drop ", paste0("X", 1:16), " (", round(var_x_tau, 1), ")")
+#'
+#' # Create sensitivity plot
 #' plot_sensitivity(tau_complete = tau_complete,
-#'                  var_x_gamma = var_x_gamma, var_x_delta = var_x_delta, var_x_name = var_x_name,
-#'                  title = "Sensitivity of the SCM Estimate", text_size = 4)
+#'                  var_x_gamma = var_x_gamma,
+#'                  var_x_delta = var_x_delta,
+#'                  var_x_name = var_x_name,
+#'                  title = "Sensitivity of the SCM Estimate",
+#'                  text_size = 4)
 #'
+#' # Use repel for better label placement with many points
+#' plot_sensitivity(tau_complete = tau_complete,
+#'                  var_x_gamma = var_x_gamma,
+#'                  var_x_delta = var_x_delta,
+#'                  var_x_name = var_x_name,
+#'                  repel = TRUE)
 #'
-#' @seealso [plot_sensitivity_r2()]
+#' @seealso [plot_sensitivity_r2()] for R-squared based sensitivity plots,
+#'   [estimate_params()] for generating the input data
 plot_sensitivity <- function(
     tau_complete, var_x_gamma, var_x_delta, var_x_name, title = NULL,
     gamma_seq = NULL, delta_seq = NULL, text_size = 3, nudge_x = 0.02, nudge_y = 0,
     repel = FALSE, tau_round = 1, nudge_x2 = NULL, nudge_y2 = NULL) {
+  # Input validation
+  if (!is.numeric(tau_complete) || length(tau_complete) != 1) {
+    stop("'tau_complete' must be a single numeric value.", call. = FALSE)
+  }
+  if (!is.numeric(var_x_gamma) || length(var_x_gamma) < 1) {
+    stop("'var_x_gamma' must be a numeric vector with at least one element.", call. = FALSE)
+  }
+  if (!is.numeric(var_x_delta) || length(var_x_delta) < 1) {
+    stop("'var_x_delta' must be a numeric vector with at least one element.", call. = FALSE)
+  }
+  if (length(var_x_gamma) != length(var_x_delta)) {
+    stop("'var_x_gamma' and 'var_x_delta' must have the same length.", call. = FALSE)
+  }
+  if (length(var_x_gamma) != length(var_x_name)) {
+    stop("'var_x_name' must have the same length as 'var_x_gamma' and 'var_x_delta'.", call. = FALSE)
+  }
+  
   if (is.null(nudge_x2)) nudge_x2 <- nudge_x
   if (is.null(nudge_y2)) nudge_y2 <- nudge_y
   if (is.null(gamma_seq)) {
@@ -130,35 +181,64 @@ plot_sensitivity <- function(
   return(p)
 }
 
-#' Sensitivity Contour Plot with Partial R Squared
+#' Sensitivity Contour Plot (Partial R-squared)
 #'
-#' Generate a sensitivity contour plot of partial R squared with the estimated treatment effect, weights, and imbalance.
+#' Generate a sensitivity contour plot using partial R-squared values to assess
+#' how unobserved confounders with certain explanatory power could affect the
+#' treatment effect estimate. This approach follows the framework of Cinelli and
+#' Hazlett (2020).
 #'
-#' @param tau_complete Estimated treatment effect with the entire data.
-#' @param df Degree of freedom of the vertical regression with the entire data.
-#' @param tau_se Standard error of the treatment effect with the entire data.
-#' @param sign_bias Sign of the bias.
-#' @param var_x_r2_Y_Z Partial R squared of the control units with the outcome.
-#' @param var_x_r2_D_Z Partial R squared of the control units with the treatment indicator.
-#' @param var_x_name Names of the control units.
-#' @param title Title of the plot
-#' @param r2_Y_Z_seq Sequence of x values to plot.
-#' @param r2_D_Z_seq Sequence of y values to plot.
-#' @param text_size Size of the text
-#' @param plot_t_stat Whether to plot t-statistic instead of bias. If true, `t_stat` argument should be provided.
-#' @param t_stat t-statistic of the treatment effect with the entire data.
-#' @param critical_value Critical value for the t-statistic contour line.
-#' @return ggplot2 object
+#' The x-axis shows the partial R-squared of the outcome regressed on the
+#' confounder (controlling for treatment and observed controls), while the y-axis
+#' shows the partial R-squared of the treatment indicator regressed on the
+#' confounder (controlling for observed controls).
+#'
+#' @param tau_complete Numeric value of the estimated treatment effect using
+#'   all control units.
+#' @param df Integer specifying the degrees of freedom from the vertical regression.
+#'   Can be obtained from the output of \code{\link{vertreg_stacked}}.
+#' @param tau_se Numeric value of the standard error of the treatment effect.
+#'   Can be obtained from the output of \code{\link{vertreg_stacked}}.
+#' @param sign_bias Integer value (1 or -1) indicating the sign of the bias to consider.
+#'   Use 1 for positive bias scenarios and -1 for negative bias scenarios.
+#' @param var_x_r2_Y_Z Numeric vector of partial R-squared values for the outcome
+#'   regression. Typically from \code{\link{estimate_params}}.
+#' @param var_x_r2_D_Z Numeric vector of partial R-squared values for the treatment
+#'   indicator regression. Same length as \code{var_x_r2_Y_Z}.
+#' @param var_x_name Character vector of labels for each benchmark point.
+#'   Same length as \code{var_x_r2_Y_Z}.
+#' @param title Character string for the plot title. Default is \code{NULL} (no title).
+#' @param r2_Y_Z_seq Numeric vector specifying the range of R-squared values for the
+#'   x-axis. Default is \code{seq(0, 1, length.out = 100)}.
+#' @param r2_D_Z_seq Numeric vector specifying the range of R-squared values for the
+#'   y-axis. Default is \code{seq(0, 1, length.out = 100)}.
+#' @param text_size Numeric value for the size of text labels. Default is 3.
+#' @param plot_t_stat Logical indicating whether to plot t-statistics on contours
+#'   instead of treatment effects. If \code{TRUE}, the \code{t_stat} argument should
+#'   also be provided. Default is \code{FALSE}.
+#' @param t_stat Numeric value of the t-statistic for the treatment effect (required
+#'   only if \code{plot_t_stat = TRUE}).
+#' @param critical_value Numeric value specifying a critical t-value for highlighting
+#'   a significance threshold contour (e.g., 1.96 for 95% confidence).
+#'   If \code{NULL} (default), no critical value line is drawn.
+#'
+#' @return A ggplot2 object that can be further customized or printed.
+#'
+#' @references
+#' Cinelli, C., & Hazlett, C. (
+#'   2020). Making sense of sensitivity: Extending omitted variable bias.
+#' \emph{Journal of the Royal Statistical Society: Series B}, 82(1), 39-67.
 #'
 #' @import ggplot2
 #' @importFrom metR geom_text_contour
 #' @importFrom grDevices contourLines
 #'
 #' @export
-#' @seealso [plot_sensitivity()]
+#' @seealso [plot_sensitivity()] for weight/imbalance plots,
+#'   [estimate_params()] for generating the input data
 #'
 #' @examples
-#' # leave-one-out sensitivity analysis
+#' # First, fit the model to get df and standard error
 #' fit <- vertreg_stacked(formula = paste("Y ~ -1 + ",
 #'                                        paste(paste0("X", 1:16),
 #'                                              collapse = " + ")),
@@ -167,11 +247,14 @@ plot_sensitivity <- function(
 #'                        pseudo_inverse = FALSE)
 #' df <- fit$df
 #' tau_se <- fit$std.error
+#'
+#' # Run leave-one-out analysis
 #' res <- estimate_params(var_y_name = "Y",
 #'                        var_x_name = paste0("X", 1:16),
 #'                        data_pre = synth_pre,
 #'                        data_post = synth_post)
-#' # plot only top 5 units with positive bias
+#'
+#' # Plot only top 5 units with positive bias
 #' res <- res[order(-res$bias), ][1:5, ]
 #' tau_complete <- res |> dplyr::pull(tau) |> unique()
 #' var_x_r2_Y_Z <- res |> dplyr::pull(r2_Y_Z)
@@ -192,6 +275,35 @@ plot_sensitivity_r2 <- function(
     var_x_r2_Y_Z, var_x_r2_D_Z, var_x_name, title = NULL,
     r2_Y_Z_seq = seq(0, 1, length.out = 100), r2_D_Z_seq = seq(0, 1, length.out = 100), text_size = 3,
     plot_t_stat = FALSE, t_stat = NULL, critical_value = NULL) {
+  # Input validation
+  if (!is.numeric(tau_complete) || length(tau_complete) != 1) {
+    stop("'tau_complete' must be a single numeric value.", call. = FALSE)
+  }
+  if (!is.numeric(df) || length(df) != 1 || df < 1) {
+    stop("'df' must be a single positive integer (degrees of freedom).", call. = FALSE)
+  }
+  if (!is.numeric(tau_se) || length(tau_se) != 1 || tau_se <= 0) {
+    stop("'tau_se' must be a single positive numeric value (standard error).", call. = FALSE)
+  }
+  if (!sign_bias %in% c(-1, 1)) {
+    stop("'sign_bias' must be either 1 (positive bias) or -1 (negative bias).", call. = FALSE)
+  }
+  if (!is.numeric(var_x_r2_Y_Z) || length(var_x_r2_Y_Z) < 1) {
+    stop("'var_x_r2_Y_Z' must be a numeric vector with at least one element.", call. = FALSE)
+  }
+  if (!is.numeric(var_x_r2_D_Z) || length(var_x_r2_D_Z) < 1) {
+    stop("'var_x_r2_D_Z' must be a numeric vector with at least one element.", call. = FALSE)
+  }
+  if (length(var_x_r2_Y_Z) != length(var_x_r2_D_Z)) {
+    stop("'var_x_r2_Y_Z' and 'var_x_r2_D_Z' must have the same length.", call. = FALSE)
+  }
+  if (length(var_x_r2_Y_Z) != length(var_x_name)) {
+    stop("'var_x_name' must have the same length as 'var_x_r2_Y_Z' and 'var_x_r2_D_Z'.", call. = FALSE)
+  }
+  if (plot_t_stat && is.null(t_stat)) {
+    stop("'t_stat' must be provided when 'plot_t_stat = TRUE'.", call. = FALSE)
+  }
+  
   out <- tibble(
     var_name = var_x_name,
     x = var_x_r2_Y_Z,

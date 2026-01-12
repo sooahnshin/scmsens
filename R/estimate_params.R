@@ -1,13 +1,28 @@
-#' Leave-one-out Analysis
+#' Leave-one-out Sensitivity Analysis
 #'
-#' Function to estimate bias parameters with dropping one control unit at a time
+#' Perform sensitivity analysis by systematically dropping one control unit at a time
+#' to estimate bias parameters. This function implements the leave-one-out approach
+#' described in Liu, Shin, and Yamauchi (2024) for assessing the robustness of
+#' synthetic control estimates to potential unobserved donor units.
 #'
-#' @param var_y_name Name of the treated unit.
-#' @param var_x_name Names of the control units.
-#' @param data_pre Pre-period data where the rows are time points and the columns include treated/control units. See `synth_pre` for example.
-#' @param data_post Post-period data. Should have identical columns to data_pre. See `synth_post` for example.
-#' @param pseudo_inverse A logical to indicate whether to use the pseudo-inverse to fit the model.
-#' @return A data.frame with the following columns:
+#' @param var_y_name A character string specifying the name of the treated unit column
+#'   in the data. This should match exactly with a column name in both \code{data_pre}
+#'   and \code{data_post}.
+#' @param var_x_name A character vector specifying the names of the control unit columns.
+#'   Each name should match exactly with column names in both \code{data_pre} and
+#'   \code{data_post}. Typically created with \code{paste0("X", 1:n)} for n control units.
+#' @param data_pre A data.frame, tibble, or matrix containing the pre-treatment period data.
+#'   Rows represent time points and columns represent units (both treated and controls).
+#'   Must contain all columns specified in \code{var_y_name} and \code{var_x_name}.
+#'   See \code{\link{synth_pre}} for an example of the expected format.
+#' @param data_post A data.frame, tibble, or matrix containing the post-treatment period data.
+#'   Must have the same column structure as \code{data_pre}. Can contain one or more
+#'   post-treatment time periods. See \code{\link{synth_post}} for an example.
+#' @param pseudo_inverse Logical indicating whether to use the Moore-Penrose pseudo-inverse
+#'   to fit the regression model. Set to \code{TRUE} when dealing with collinear or
+#'   near-collinear control units. Default is \code{FALSE}.
+#'
+#' @return A data.frame (tibble) with the following columns:
 #'    - `dropped_unit`: Name of the control unit that is dropped.
 #'    - `time_from_treatment`: Time from the treatment.
 #'    - `estimate`: Estimated treatment effect.
@@ -39,17 +54,57 @@
 #' @importFrom sensemakr partial_r2
 #'
 #' @seealso [estimate_params_partial()], [estimate_params_partial_multi()]
+#'
+#' @references
+#' Liu, N., Shin, S., & Yamauchi, S. (2024). Synthetic Control Method with
+#' Missing Pre-treatment Outcomes. Working Paper.
+#'
 estimate_params <- function(var_y_name,
                             var_x_name,
                             data_pre,
                             data_post,
                             pseudo_inverse = FALSE) {
+  # Input validation
+
+  if (!is.character(var_y_name) || length(var_y_name) != 1) {
+    stop("'var_y_name' must be a single character string specifying the treated unit column name.",
+         call. = FALSE)
+  }
+  if (!is.character(var_x_name) || length(var_x_name) < 1) {
+    stop("'var_x_name' must be a character vector with at least one control unit name.",
+         call. = FALSE)
+  }
+  if (is.null(data_pre) || (nrow(data_pre) < 1)) {
+    stop("'data_pre' must be a non-empty data.frame, tibble, or matrix.",
+         call. = FALSE)
+  }
+  if (is.null(data_post) || (nrow(data_post) < 1)) {
+    stop("'data_post' must be a non-empty data.frame, tibble, or matrix.",
+         call. = FALSE)
+  }
+  
   if (is.matrix(data_pre) | is_tibble(data_pre)) {
     data_pre <- as.data.frame(data_pre)
   }
   if (is.matrix(data_post) | is_tibble(data_post)) {
     data_post <- as.data.frame(data_post)
   }
+  
+  # Validate column names exist in data
+  all_vars <- c(var_y_name, var_x_name)
+  missing_pre <- setdiff(all_vars, names(data_pre))
+  if (length(missing_pre) > 0) {
+    stop("The following columns are missing from 'data_pre': ",
+         paste(missing_pre, collapse = ", "), ".",
+         call. = FALSE)
+  }
+  missing_post <- setdiff(all_vars, names(data_post))
+  if (length(missing_post) > 0) {
+    stop("The following columns are missing from 'data_post': ",
+         paste(missing_post, collapse = ", "), ".",
+         call. = FALSE)
+  }
+
   data_prepost <- dplyr::bind_rows(
     dplyr::mutate(data_pre, D = 0, t = -rev((1:dplyr::n()) - 1)),
     dplyr::mutate(data_post, D = 1, t = 1:dplyr::n())
@@ -122,20 +177,41 @@ estimate_params <- function(var_y_name,
   return(res)
 }
 
-#' Estimate Sensitivity Parameters with A Single Control Unit with Partially Observed Data
+#' Estimate Sensitivity Parameters with Partially Observed Data (Single Unit)
 #'
-#' Function to use partially observed data to estimate gamma and imbalance,
-#' in case of a single control unit with missing observations.
-#' See [estimate_params_partial_multi()] for multiple control units.
+#' Estimate the bias parameters (gamma, delta, and bias) when a single control unit
+#' has partially observed data (i.e., missing values in some pre-treatment periods).
+#' This function uses the observed portion of the data to estimate how much bias
+#' would result from excluding this control unit.
 #'
-#' @param fm_z_on_x A string specifying the regression of Z on X in the formula
-#'   format (e.g., "Z ~ X1 + X2").
-#' @param fm_y_on_z_and_x A string specifying the vertical regression with
-#'   missing obs in the formula format (e.g, "Y ~ X1 + X2 + Z").
-#' @param data_pre Pre-period data where the rows are time points and the columns include treated/control units. See `synth_pre` for example.
-#' @param data_post Post-period data. Should have identical columns to data_pre. See `synth_post` for example.
-#' @param pseudo_inverse A logical to indicate whether to use the pseudo-inverse to fit the model.
-#' @return A list of `gamma`, `imbalance`, and `bias`.
+#' For multiple control units with missing data, use \code{\link{estimate_params_partial_multi}}.
+#'
+#' @param fm_z_on_x A character string specifying the formula for regressing the
+#'   partially observed control unit (Z) on the fully observed control units (X).
+#'   For example, \code{"X1 ~ X2 + X3 + X4"} if X1 is the partially observed unit.
+#'   The intercept is automatically removed.
+#' @param fm_y_on_z_and_x A character string specifying the vertical regression formula
+#'   with the treated unit as the outcome and all control units (including the
+#'   partially observed one) as predictors. For example, \code{"Y ~ X1 + X2 + X3 + X4"}.
+#'   The intercept is automatically removed.
+#' @param data_pre A data.frame, tibble, or matrix containing the pre-treatment period data.
+#'   Should only contain complete cases for the partially observed unit (i.e., rows
+#'   where the partially observed unit is not NA). See \code{\link{synth_pre}} for format.
+#' @param data_post A data.frame, tibble, or matrix containing the post-treatment period data.
+#'   Currently only supports a single post-treatment period (one row).
+#'   See \code{\link{synth_post}} for format.
+#' @param pseudo_inverse Logical indicating whether to use the Moore-Penrose pseudo-inverse
+#'   to fit the regression model. Default is \code{FALSE}.
+#'
+#' @return A named list containing:
+#' \describe{
+#'   \item{gamma}{The weight (coefficient) of the partially observed control unit
+#'     in the vertical regression.}
+#'   \item{delta}{The imbalance (prediction error) for the partially observed unit
+#'     in the post-treatment period.}
+#'   \item{bias}{The estimated bias from excluding this control unit, calculated
+#'     as \code{gamma * delta}.}
+#' }
 #'
 #' @importFrom stats coef
 #' @importFrom dplyr row_number
@@ -168,6 +244,24 @@ estimate_params_partial <- function(
     data_pre,
     data_post,
     pseudo_inverse = FALSE) {
+  # Input validation
+  if (!is.character(fm_z_on_x) || length(fm_z_on_x) != 1) {
+    stop("'fm_z_on_x' must be a single character string specifying the formula.",
+         call. = FALSE)
+  }
+  if (!is.character(fm_y_on_z_and_x) || length(fm_y_on_z_and_x) != 1) {
+    stop("'fm_y_on_z_and_x' must be a single character string specifying the formula.",
+         call. = FALSE)
+  }
+  if (is.null(data_pre) || (nrow(data_pre) < 1)) {
+    stop("'data_pre' must be a non-empty data.frame, tibble, or matrix.",
+         call. = FALSE)
+  }
+  if (is.null(data_post) || (nrow(data_post) < 1)) {
+    stop("'data_post' must be a non-empty data.frame, tibble, or matrix.",
+         call. = FALSE)
+  }
+
   if (is.matrix(data_pre) | is_tibble(data_pre)) {
     data_pre <- as.data.frame(data_pre)
   }
@@ -175,8 +269,13 @@ estimate_params_partial <- function(
     data_post <- as.data.frame(data_post)
   }
 
-  # assume T = T0 + 1 (only one post-period)
-  if (nrow(data_post) != 1) stop("Only one post_period is allowed")
+  # Check for single post-period with more informative message
+  if (nrow(data_post) != 1) {
+    stop("'data_post' must contain exactly one row (one post-treatment period). ",
+         "You provided ", nrow(data_post), " rows. ",
+         "For multiple post-treatment periods, run the analysis separately for each period.",
+         call. = FALSE)
+  }
 
   # variable with missing
   var_z_name <- all.vars(as.formula(fm_z_on_x))[1]
@@ -232,19 +331,36 @@ estimate_params_partial <- function(
   )
 }
 
-#' Estimate Sensitivity Parameters with Multiple Control Units with Partially Observed Data
+#' Estimate Sensitivity Parameters with Partially Observed Data (Multiple Units)
 #'
-#' Function to use partially observed data to estimate gamma and imbalance,
-#' in case of multiple control units with missing observations.
-#' See [estimate_params_partial()] for a single control unit.
+#' Estimate the combined bias parameters when multiple control units have partially
+#' observed data. This function creates a weighted combination of the partially
+#' observed units and estimates the overall bias from excluding these units.
 #'
-#' @param var_z_name A vector of strings specifying the name of the control unit.
-#' @param var_x_name A vector of strings specifying the name of the control unit.
-#' @param var_y_name Name of the treated unit.
-#' @param data_pre Pre-period data where the rows are time points and the columns include treated/control units. See `synth_pre` for example.
-#' @param data_post Post-period data. Should have identical columns to data_pre. See `synth_post` for example.
-#' @param pseudo_inverse A logical to indicate whether to use the pseudo-inverse to fit the model.
-#' @return A list of `gamma`, `imbalance`, and `bias`.
+#' For a single control unit with missing data, use \code{\link{estimate_params_partial}}.
+#'
+#' @param var_z_name A character vector specifying the names of the partially observed
+#'   control unit columns. For example, \code{c("X1", "X2")} if both X1 and X2 have
+#'   missing values.
+#' @param var_x_name A character vector specifying the names of the fully observed
+#'   control unit columns. These units should have complete data for all time periods.
+#' @param var_y_name A character string specifying the name of the treated unit column.
+#' @param data_pre A data.frame, tibble, or matrix containing the pre-treatment period data.
+#'   Should contain complete cases where all partially observed units have values.
+#'   See \code{\link{synth_pre}} for format.
+#' @param data_post A data.frame, tibble, or matrix containing the post-treatment period data.
+#'   Currently only supports a single post-treatment period (one row).
+#'   See \code{\link{synth_post}} for format.
+#' @param pseudo_inverse Logical indicating whether to use the Moore-Penrose pseudo-inverse
+#'   to fit the regression model. Default is \code{FALSE}.
+#'
+#' @return A named list containing:
+#' \describe{
+#'   \item{gamma}{Always returns 1, as the combined effect is captured in the imbalance.}
+#'   \item{imbalance}{The combined imbalance (prediction error) for all partially
+#'     observed units, weighted by their coefficients.}
+#'   \item{bias}{The estimated bias from excluding these control units.}
+#' }
 #'
 #' @importFrom tidyselect all_of
 #'
@@ -275,14 +391,57 @@ estimate_params_partial_multi <- function(
     data_pre,
     data_post,
     pseudo_inverse = FALSE) {
+  # Input validation
+  if (!is.character(var_z_name) || length(var_z_name) < 1) {
+    stop("'var_z_name' must be a character vector with at least one partially observed unit name.",
+         call. = FALSE)
+  }
+  if (!is.character(var_x_name) || length(var_x_name) < 1) {
+    stop("'var_x_name' must be a character vector with at least one fully observed unit name.",
+         call. = FALSE)
+  }
+  if (!is.character(var_y_name) || length(var_y_name) != 1) {
+    stop("'var_y_name' must be a single character string specifying the treated unit column name.",
+         call. = FALSE)
+  }
+  if (is.null(data_pre) || (nrow(data_pre) < 1)) {
+    stop("'data_pre' must be a non-empty data.frame, tibble, or matrix.",
+         call. = FALSE)
+  }
+  if (is.null(data_post) || (nrow(data_post) < 1)) {
+    stop("'data_post' must be a non-empty data.frame, tibble, or matrix.",
+         call. = FALSE)
+  }
+  
   if (is.matrix(data_pre) | is_tibble(data_pre)) {
     data_pre <- as.data.frame(data_pre)
   }
   if (is.matrix(data_post) | is_tibble(data_post)) {
     data_post <- as.data.frame(data_post)
   }
-  # assume T = T0 + 1 (only one post-period)
-  if (nrow(data_post) != 1) stop("Only one post_period is allowed")
+  
+  # Check for single post-period with more informative message
+  if (nrow(data_post) != 1) {
+    stop("'data_post' must contain exactly one row (one post-treatment period). ",
+         "You provided ", nrow(data_post), " rows. ",
+         "For multiple post-treatment periods, run the analysis separately for each period.",
+         call. = FALSE)
+  }
+  
+  # Validate column names exist in data
+  all_vars <- c(var_y_name, var_z_name, var_x_name)
+  missing_pre <- setdiff(all_vars, names(data_pre))
+  if (length(missing_pre) > 0) {
+    stop("The following columns are missing from 'data_pre': ",
+         paste(missing_pre, collapse = ", "), ".",
+         call. = FALSE)
+  }
+  missing_post <- setdiff(all_vars, names(data_post))
+  if (length(missing_post) > 0) {
+    stop("The following columns are missing from 'data_post': ",
+         paste(missing_post, collapse = ", "), ".",
+         call. = FALSE)
+  }
 
   fm_y_on_z_and_x <- paste(var_y_name, "~ -1 +", paste(var_z_name, collapse = "+"), "+", paste(var_x_name, collapse = "+"))
   fm_y_on_z_and_x <- as.formula(fm_y_on_z_and_x)
