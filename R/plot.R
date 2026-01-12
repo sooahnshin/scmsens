@@ -225,9 +225,9 @@ plot_sensitivity <- function(
 #' @return A ggplot2 object that can be further customized or printed.
 #'
 #' @references
-#' Cinelli, C., & Hazlett, C. (
-#'   2020). Making sense of sensitivity: Extending omitted variable bias.
-#' \emph{Journal of the Royal Statistical Society: Series B}, 82(1), 39-67.
+#' Cinelli, C., & Hazlett, C. (2020). Making sense of sensitivity: Extending
+#' omitted variable bias. \emph{Journal of the Royal Statistical Society:
+#' Series B}, 82(1), 39-67.
 #'
 #' @import ggplot2
 #' @importFrom metR geom_text_contour
