@@ -1,9 +1,9 @@
-#' Leave-one-out Sensitivity Analysis
+#' Leave-one-out Analysis
 #'
-#' Perform sensitivity analysis by systematically dropping one control unit at a time
-#' to estimate bias parameters. This function implements the leave-one-out approach
-#' described in Liu, Shin, and Yamauchi (2024) for assessing the robustness of
-#' synthetic control estimates to potential unobserved donor units.
+#' Implement the bias decomposition described in Liu, Shin, and Yamauchi (2024),
+#' where each observed control unit is hypothetically dropped from the analysis
+#' one at a time to compute its weight (gamma), imbalance (delta), and bias
+#' contribution (gamma × delta).
 #'
 #' @param var_y_name A character string specifying the name of the treated unit column
 #'   in the data. This should match exactly with a column name in both \code{data_pre}

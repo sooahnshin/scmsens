@@ -13,18 +13,29 @@ estimate_params(
 )
 }
 \arguments{
-\item{var_y_name}{Name of the treated unit.}
+\item{var_y_name}{A character string specifying the name of the treated unit column
+in the data. This should match exactly with a column name in both \code{data_pre}
+and \code{data_post}.}
 
-\item{var_x_name}{Names of the control units.}
+\item{var_x_name}{A character vector specifying the names of the control unit columns.
+Each name should match exactly with column names in both \code{data_pre} and
+\code{data_post}. Typically created with \code{paste0("X", 1:n)} for n control units.}
 
-\item{data_pre}{Pre-period data where the rows are time points and the columns include treated/control units. See \code{synth_pre} for example.}
+\item{data_pre}{A data.frame, tibble, or matrix containing the pre-treatment period data.
+Rows represent time points and columns represent units (both treated and controls).
+Must contain all columns specified in \code{var_y_name} and \code{var_x_name}.
+See \code{\link{synth_pre}} for an example of the expected format.}
 
-\item{data_post}{Post-period data. Should have identical columns to data_pre. See \code{synth_post} for example.}
+\item{data_post}{A data.frame, tibble, or matrix containing the post-treatment period data.
+Must have the same column structure as \code{data_pre}. Can contain one or more
+post-treatment time periods. See \code{\link{synth_post}} for an example.}
 
-\item{pseudo_inverse}{A logical to indicate whether to use the pseudo-inverse to fit the model.}
+\item{pseudo_inverse}{Logical indicating whether to use the Moore-Penrose pseudo-inverse
+to fit the regression model. Set to \code{TRUE} when dealing with collinear or
+near-collinear control units. Default is \code{FALSE}.}
 }
 \value{
-A data.frame with the following columns:
+A data.frame (tibble) with the following columns:
 \itemize{
 \item \code{dropped_unit}: Name of the control unit that is dropped.
 \item \code{time_from_treatment}: Time from the treatment.
@@ -44,7 +55,10 @@ A data.frame with the following columns:
 }
 }
 \description{
-Function to estimate bias parameters with dropping one control unit at a time
+Implement the bias decomposition described in Liu, Shin, and Yamauchi (2024),
+where each observed control unit is hypothetically dropped from the analysis
+one at a time to compute its weight (gamma), imbalance (delta), and bias
+contribution (gamma × delta).
 }
 \examples{
 estimate_params(
@@ -55,6 +69,10 @@ estimate_params(
   pseudo_inverse = FALSE
 )
 
+}
+\references{
+Liu, N., Shin, S., & Yamauchi, S. (2024). Synthetic Control Method with
+Missing Pre-treatment Outcomes. Working Paper.
 }
 \seealso{
 \code{\link[=estimate_params_partial]{estimate_params_partial()}}, \code{\link[=estimate_params_partial_multi]{estimate_params_partial_multi()}}

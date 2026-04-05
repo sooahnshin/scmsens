@@ -2,7 +2,7 @@
 % Please edit documentation in R/estimate_params.R
 \name{estimate_params_partial_multi}
 \alias{estimate_params_partial_multi}
-\title{Estimate Sensitivity Parameters with Multiple Control Units with Partially Observed Data}
+\title{Estimate Sensitivity Parameters with Partially Observed Data (Multiple Units)}
 \usage{
 estimate_params_partial_multi(
   var_z_name,
@@ -14,25 +14,42 @@ estimate_params_partial_multi(
 )
 }
 \arguments{
-\item{var_z_name}{A vector of strings specifying the name of the control unit.}
+\item{var_z_name}{A character vector specifying the names of the partially observed
+control unit columns. For example, \code{c("X1", "X2")} if both X1 and X2 have
+missing values.}
 
-\item{var_x_name}{A vector of strings specifying the name of the control unit.}
+\item{var_x_name}{A character vector specifying the names of the fully observed
+control unit columns. These units should have complete data for all time periods.}
 
-\item{var_y_name}{Name of the treated unit.}
+\item{var_y_name}{A character string specifying the name of the treated unit column.}
 
-\item{data_pre}{Pre-period data where the rows are time points and the columns include treated/control units. See \code{synth_pre} for example.}
+\item{data_pre}{A data.frame, tibble, or matrix containing the pre-treatment period data.
+Should contain complete cases where all partially observed units have values.
+See \code{\link{synth_pre}} for format.}
 
-\item{data_post}{Post-period data. Should have identical columns to data_pre. See \code{synth_post} for example.}
+\item{data_post}{A data.frame, tibble, or matrix containing the post-treatment period data.
+Currently only supports a single post-treatment period (one row).
+See \code{\link{synth_post}} for format.}
 
-\item{pseudo_inverse}{A logical to indicate whether to use the pseudo-inverse to fit the model.}
+\item{pseudo_inverse}{Logical indicating whether to use the Moore-Penrose pseudo-inverse
+to fit the regression model. Default is \code{FALSE}.}
 }
 \value{
-A list of \code{gamma}, \code{imbalance}, and \code{bias}.
+A named list containing:
+\describe{
+\item{gamma}{Always returns 1, as the combined effect is captured in the imbalance.}
+\item{imbalance}{The combined imbalance (prediction error) for all partially
+observed units, weighted by their coefficients.}
+\item{bias}{The estimated bias from excluding these control units.}
+}
 }
 \description{
-Function to use partially observed data to estimate gamma and imbalance,
-in case of multiple control units with missing observations.
-See \code{\link[=estimate_params_partial]{estimate_params_partial()}} for a single control unit.
+Estimate the combined bias parameters when multiple control units have partially
+observed data. This function creates a weighted combination of the partially
+observed units and estimates the overall bias from excluding these units.
+}
+\details{
+For a single control unit with missing data, use \code{\link{estimate_params_partial}}.
 }
 \examples{
 # Suppose X1 and X2 are partially observed

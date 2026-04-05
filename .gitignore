@@ -8,4 +8,6 @@
 
 ## for development
 workflow.R
+.claude/
 inst/doc
+assets/

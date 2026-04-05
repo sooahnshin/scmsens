@@ -2,7 +2,7 @@
 % Please edit documentation in R/synthetic_data.R
 \name{generate_synth_data_ar}
 \alias{generate_synth_data_ar}
-\title{Synthetic Data with Autoregressive Model AR(l)}
+\title{Generate Synthetic Data with Autoregressive Model}
 \usage{
 generate_synth_data_ar(
   t0 = 99,
@@ -13,33 +13,55 @@ generate_synth_data_ar(
 )
 }
 \arguments{
-\item{t0}{Numeric, the number of pre-treatment time periods (observations).}
+\item{t0}{Integer specifying the number of pre-treatment time periods.
+Default is 99.}
 
-\item{n}{Numeric, the number of donor units (variables).}
+\item{n}{Integer specifying the number of control (donor) units. Default is 20.}
 
-\item{tau}{Numeric, the value of ATT (Average Treatment Effect on the Treated).}
+\item{tau}{Numeric value specifying the true Average Treatment Effect on the
+Treated (ATT). This is added to the treated unit's outcome in the post-treatment
+period. Default is 10.}
 
-\item{ar}{Numeric vector of length \eqn{l}, coefficients for AR model.}
+\item{ar}{Numeric vector of AR coefficients. The length determines the order of
+the AR process. Default is \code{c(0.7, 0.2, -0.1, -0.3)} for an AR(4) process.}
 
-\item{init}{\eqn{(n+1)} by \eqn{l} matrix, initial values for AR model (optional).}
+\item{init}{Optional matrix of dimension (n+1) x length(ar) specifying initial
+values for each unit. If \code{NULL} (default), random initial values are used.}
 }
 \value{
 A list containing the following elements:
-\itemize{
-\item \code{df_pre_full}: A tibble of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
-\item \code{df_prepost_full}: A tibble of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
-\item \code{tau}: A numeric value of ATT
-\item \code{.call}: The matched call.
+\describe{
+\item{df_pre_full}{A tibble of dimension (t0 x (n+1)) containing the pre-treatment
+data. Columns X1, X2, ..., Xn are the control units, and Y is the treated unit.}
+\item{df_prepost_full}{A tibble of dimension ((t0+1) x (n+2)) containing both
+pre- and post-treatment data. Includes a treatment indicator column D.
+The last row is the post-treatment observation.}
+\item{tau}{The true ATT value.}
+\item{.call}{The matched call used to create this object.}
 }
 }
 \description{
-This function generates synthetic data based on an autoregressive model of order \eqn{l} (AR(\eqn{l})).
+Generate synthetic panel data where all units (treated and controls) follow an
+autoregressive process of order l. This is useful for simulation studies where
+temporal dynamics are important.
+}
+\details{
+Each unit is generated independently from an AR(l) process with the same
+coefficients but potentially different initial values.
 }
 \examples{
+# Generate AR(4) synthetic data
 set.seed(123)
-synth <- generate_synth_data_ar(t0 = 99, n = 20, tau = 10, ar = c(0.7, 0.2, -0.1, -0.3))
+synth <- generate_synth_data_ar(t0 = 99, n = 20, tau = 10)
+
+# Access the data
+head(synth$df_pre_full)
+
+# Use with custom AR coefficients
+synth_ar2 <- generate_synth_data_ar(t0 = 50, n = 10, tau = 5, ar = c(0.5, 0.3))
 
 }
 \seealso{
-\code{\link[=simulate_ar_l_with_initial]{simulate_ar_l_with_initial()}}
+\code{\link{simulate_ar_l_with_initial}} for simulating individual AR series,
+\code{\link{generate_synth_data_vertreg}}, \code{\link{generate_synth_data_ife}}
 }

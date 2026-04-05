@@ -2,33 +2,61 @@
 % Please edit documentation in R/vertreg.R
 \name{vertreg}
 \alias{vertreg}
-\title{Vertical Regression}
+\title{Vertical Regression for Synthetic Control}
 \usage{
 vertreg(formula, data_pre, data_post, pseudo_inverse = FALSE)
 }
 \arguments{
-\item{formula}{A string to specify the vertical regression model (e.g., "Y ~ X1 + X2" where "Y" is treated unit, "X1" and "X2" are control units).}
+\item{formula}{A character string or formula object specifying the vertical
+regression model. The left-hand side should be the treated unit and the
+right-hand side should include all control units. For example,
+\code{"Y ~ X1 + X2 + X3"} or \code{"Y ~ -1 + X1 + X2 + X3"} (without intercept).
+The intercept is automatically removed regardless of the formula specification.}
 
-\item{data_pre}{Pre-period data where the rows are time points and the columns include treated/control units. See \code{synth_pre} for example.}
+\item{data_pre}{A data.frame, tibble, or matrix containing the pre-treatment period data.
+Rows represent time points and columns represent units. Must contain all
+variables specified in the formula. See \code{\link{synth_pre}} for an example.}
 
-\item{data_post}{Post-period data. Should have identical columns to data_pre. See \code{synth_post} for example.}
+\item{data_post}{A data.frame, tibble, or matrix containing the post-treatment period data.
+Must have the same column structure as \code{data_pre}. Can contain one or more
+post-treatment time periods. See \code{\link{synth_post}} for an example.}
 
-\item{pseudo_inverse}{A logical to indicate whether to use the pseudo-inverse to fit the model.}
+\item{pseudo_inverse}{Logical indicating whether to use the Moore-Penrose pseudo-inverse
+to fit the regression model. Set to \code{TRUE} when dealing with collinear or
+near-collinear control units. Default is \code{FALSE}.}
 }
 \value{
-A vector of treatment effects.
+A numeric vector of estimated treatment effects, one for each post-treatment
+time period (row in \code{data_post}).
 }
 \description{
-Function to run a vertical regression.
+Run a vertical regression to estimate treatment effects in the Synthetic Control
+Method framework. This function fits a regression of the treated unit's outcomes
+on the control units' outcomes in the pre-treatment period, then uses the fitted
+model to predict the counterfactual outcome in the post-treatment period.
+}
+\details{
+The treatment effect is calculated as the difference between the observed
+outcome and the predicted counterfactual outcome.
 }
 \examples{
+# Basic usage with synthetic data
 vertreg(
   formula = paste("Y ~ -1 + ", paste(paste0("X", 1:16), collapse = " + ")),
   data_pre = synth_pre,
   data_post = synth_post
 )
 
+# With pseudo-inverse for potentially collinear data
+vertreg(
+  formula = "Y ~ X1 + X2 + X3",
+  data_pre = synth_pre,
+  data_post = synth_post,
+  pseudo_inverse = TRUE
+)
+
 }
 \seealso{
-\code{\link[=vertreg_stacked]{vertreg_stacked()}}
+\code{\link{vertreg_stacked}} for inference with standard errors,
+\code{\link{estimate_params}} for sensitivity analysis
 }

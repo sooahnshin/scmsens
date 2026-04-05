@@ -12,16 +12,16 @@
 #' @section Main Functions:
 #' The package provides the following main functions:
 #' \itemize{
-#'   \item \code{\link{estimate_params}}: Perform leave-one-out sensitivity analysis
-#'     by dropping one control unit at a time to estimate bias parameters.
+#'   \item \code{\link{estimate_params}}: Leave-one-out analysis implementing
+#'     the bias decomposition by dropping one control unit at a time.
 #'   \item \code{\link{estimate_params_partial}}: Estimate sensitivity parameters
 #'     with a single control unit that has partially observed data.
 #'   \item \code{\link{estimate_params_partial_multi}}: Estimate sensitivity parameters
 #'     with multiple control units that have partially observed data.
 #'   \item \code{\link{vertreg}}: Run a vertical regression to estimate
 #'     treatment effects in SCM settings.
-#'   \item \code{\link{vertreg_stacked}}: Run a stacked vertical regression
-#'     with a treatment indicator for inference.
+#'   \item \code{\link{vertreg_stacked}}: Run a vertical regression with
+#'     a treatment indicator, connecting to the OVB framework.
 #'   \item \code{\link{plot_sensitivity}}: Generate sensitivity contour plots
 #'     showing how treatment effects vary with weight and imbalance parameters.
 #'   \item \code{\link{plot_sensitivity_r2}}: Generate sensitivity contour plots
@@ -72,6 +72,5 @@
 #' Series B (Statistical Methodology)}, 82(1), 39-67.
 #' \doi{10.1111/rssb.12348}
 #'
-#' @docType package
 #' @name scmsens-package
 NULL

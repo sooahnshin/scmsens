@@ -2,7 +2,7 @@
 % Please edit documentation in R/synthetic_data.R
 \name{generate_synth_data_ife}
 \alias{generate_synth_data_ife}
-\title{Synthetic Data with Interactive Fixed Effect Model}
+\title{Generate Synthetic Data with Interactive Fixed Effects Model}
 \usage{
 generate_synth_data_ife(
   t0 = 99,
@@ -19,55 +19,84 @@ generate_synth_data_ife(
 )
 }
 \arguments{
-\item{t0}{Numeric, the number of pre-treatment time periods (observations).}
+\item{t0}{Integer specifying the number of pre-treatment time periods.
+Default is 99.}
 
-\item{n}{Numeric, the number of donor units (variables).}
+\item{n}{Integer specifying the number of control (donor) units. Default is 20.}
 
-\item{tau}{Numeric, the value of ATT (Average Treatment Effect on the Treated).}
+\item{tau}{Numeric value specifying the true Average Treatment Effect on the
+Treated (ATT). Default is 10.}
 
-\item{phi}{Numeric matrix, \eqn{((n+1) \times J)} matrix of unit fixed effects.}
+\item{phi}{Optional matrix of dimension ((n+1) x J) containing unit-specific
+factor loadings. If \code{NULL}, generated randomly from N(0, 1).}
 
-\item{mu}{Numeric matrix, \eqn{(J \times (t0+1))} matrix of time fixed effects.}
+\item{mu}{Optional matrix of dimension (J x (t0+1)) containing time-varying
+factors. If \code{NULL}, generated randomly from N(0, 1).}
 
-\item{alpha}{Numeric vector, \eqn{(n+1)}-length vector of unit fixed effects.}
+\item{alpha}{Optional vector of length (n+1) containing additive unit fixed effects.
+If \code{NULL} (default), set to zero.}
 
-\item{nu}{Numeric vector, \eqn{(t0+1)}-length vector of time fixed effects.}
+\item{nu}{Optional vector of length (t0+1) containing additive time fixed effects.
+If \code{NULL} (default), set to zero.}
 
-\item{X}{Numeric array, \eqn{((n+1) \times (t0+1) \times k)} \eqn{k}-dimensional time varying covariates (optional).}
+\item{X}{Optional array of dimension ((n+1) x (t0+1) x k) containing time-varying
+covariates. If \code{NULL} (default), no covariates are included.}
 
-\item{beta}{Numeric vector, \eqn{k}-length vector of coefficients for time varying covariates.}
+\item{beta}{Optional vector of length k containing coefficients for time-varying
+covariates. If \code{NULL} (default), generated randomly from N(0, 1).}
 
-\item{epsilon_sd}{Numeric, standard deviation of error term.}
+\item{epsilon_sd}{Numeric value specifying the standard deviation of the
+error term. Default is 1.}
 
-\item{J}{Numeric, dimension of factor (interacted fixed effects).}
+\item{J}{Integer specifying the number of factors (dimension of interactive
+fixed effects). Required if \code{phi} and \code{mu} are not provided.}
 }
 \value{
-A list containing the following elements:
-\itemize{
-\item \code{df_pre_full}: A tibble of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
-\item \code{df_prepost_full}: A tibble of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
-\item \code{tau}: A numeric value of ATT
-\item \code{params}: A list of parameters used to generate the data.
-\item \code{.call}: The matched call.
+A list of class \code{"synth_ife"} containing:
+\describe{
+\item{df_pre_full}{A tibble of dimension (t0 x (n+1)) containing the pre-treatment
+data. Columns X1, X2, ..., Xn are the control units, and Y is the treated unit.}
+\item{df_prepost_full}{A tibble of dimension ((t0+1) x (n+2)) containing both
+pre- and post-treatment data. Includes a treatment indicator column D.}
+\item{tau}{The true ATT value.}
+\item{params}{A list containing the parameters used for data generation:
+alpha, nu, phi, mu, beta, and epsilon.}
+\item{.call}{The matched call used to create this object.}
 }
 }
 \description{
-This function generates synthetic data based on an interactive fixed effect model.
+Generate synthetic panel data using an interactive fixed effects (IFE) model,
+which is commonly used in synthetic control applications. The IFE model allows
+for unit-specific factor loadings interacting with time-varying factors.
+}
+\details{
+The model generates outcomes as:
+\deqn{Y_{it} = X_{it}'\beta + \alpha_i + \nu_t + \phi_i'\mu_t + \epsilon_{it}}
+
+where \eqn{\phi_i} are unit-specific factor loadings and \eqn{\mu_t} are
+time-varying factors.
 }
 \examples{
+# Generate IFE synthetic data with 2 factors
 set.seed(123)
-synth <- generate_synth_data_ife(
-  t0 = 99,
-  n = 20,
-  tau = 10,
-  phi = NULL,
-  mu = NULL,
-  alpha = NULL,
-  nu = NULL,
-  X = NULL,
-  beta = NULL,
-  epsilon_sd = 1,
-  J = 2
+synth <- generate_synth_data_ife(t0 = 99, n = 20, tau = 10, J = 2)
+
+# Access the generated data
+head(synth$df_pre_full)
+
+# Access the parameters used for generation
+dim(synth$params$phi)  # Factor loadings
+dim(synth$params$mu)   # Time factors
+
+# Generate with custom factor loadings
+custom_phi <- matrix(rnorm(42), ncol = 2)  # 21 units x 2 factors
+custom_mu <- matrix(rnorm(200), nrow = 2)  # 2 factors x 100 time periods
+synth_custom <- generate_synth_data_ife(
+  t0 = 99, n = 20, tau = 5,
+  phi = custom_phi, mu = custom_mu
 )
 
+}
+\seealso{
+\code{\link{generate_synth_data_vertreg}}, \code{\link{generate_synth_data_ar}}
 }

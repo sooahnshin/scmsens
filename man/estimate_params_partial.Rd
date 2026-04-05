@@ -2,7 +2,7 @@
 % Please edit documentation in R/estimate_params.R
 \name{estimate_params_partial}
 \alias{estimate_params_partial}
-\title{Estimate Sensitivity Parameters with A Single Control Unit with Partially Observed Data}
+\title{Estimate Sensitivity Parameters with Partially Observed Data (Single Unit)}
 \usage{
 estimate_params_partial(
   fm_z_on_x,
@@ -13,25 +13,46 @@ estimate_params_partial(
 )
 }
 \arguments{
-\item{fm_z_on_x}{A string specifying the regression of Z on X in the formula
-format (e.g., "Z ~ X1 + X2").}
+\item{fm_z_on_x}{A character string specifying the formula for regressing the
+partially observed control unit (Z) on the fully observed control units (X).
+For example, \code{"X1 ~ X2 + X3 + X4"} if X1 is the partially observed unit.
+The intercept is automatically removed.}
 
-\item{fm_y_on_z_and_x}{A string specifying the vertical regression with
-missing obs in the formula format (e.g, "Y ~ X1 + X2 + Z").}
+\item{fm_y_on_z_and_x}{A character string specifying the vertical regression formula
+with the treated unit as the outcome and all control units (including the
+partially observed one) as predictors. For example, \code{"Y ~ X1 + X2 + X3 + X4"}.
+The intercept is automatically removed.}
 
-\item{data_pre}{Pre-period data where the rows are time points and the columns include treated/control units. See \code{synth_pre} for example.}
+\item{data_pre}{A data.frame, tibble, or matrix containing the pre-treatment period data.
+Should only contain complete cases for the partially observed unit (i.e., rows
+where the partially observed unit is not NA). See \code{\link{synth_pre}} for format.}
 
-\item{data_post}{Post-period data. Should have identical columns to data_pre. See \code{synth_post} for example.}
+\item{data_post}{A data.frame, tibble, or matrix containing the post-treatment period data.
+Currently only supports a single post-treatment period (one row).
+See \code{\link{synth_post}} for format.}
 
-\item{pseudo_inverse}{A logical to indicate whether to use the pseudo-inverse to fit the model.}
+\item{pseudo_inverse}{Logical indicating whether to use the Moore-Penrose pseudo-inverse
+to fit the regression model. Default is \code{FALSE}.}
 }
 \value{
-A list of \code{gamma}, \code{imbalance}, and \code{bias}.
+A named list containing:
+\describe{
+\item{gamma}{The weight (coefficient) of the partially observed control unit
+in the vertical regression.}
+\item{delta}{The imbalance (prediction error) for the partially observed unit
+in the post-treatment period.}
+\item{bias}{The estimated bias from excluding this control unit, calculated
+as \code{gamma * delta}.}
+}
 }
 \description{
-Function to use partially observed data to estimate gamma and imbalance,
-in case of a single control unit with missing observations.
-See \code{\link[=estimate_params_partial_multi]{estimate_params_partial_multi()}} for multiple control units.
+Estimate the bias parameters (gamma, delta, and bias) when a single control unit
+has partially observed data (i.e., missing values in some pre-treatment periods).
+This function uses the observed portion of the data to estimate how much bias
+would result from excluding this control unit.
+}
+\details{
+For multiple control units with missing data, use \code{\link{estimate_params_partial_multi}}.
 }
 \examples{
 # Suppose X1 is partially observed

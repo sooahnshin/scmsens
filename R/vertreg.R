@@ -94,15 +94,12 @@ vertreg <- function(formula, data_pre, data_post, pseudo_inverse = FALSE) {
   return(tau)
 }
 
-#' Stacked Vertical Regression with Inference
+#' Vertical Regression (With Treatment Indicator)
 #'
-#' Run a vertical regression in stacked form with a treatment indicator to obtain
-#' treatment effect estimates with standard errors. This function combines pre-treatment
-#' and post-treatment data, adds a treatment indicator, and fits the regression to
-#' enable statistical inference.
-#'
-#' This is the recommended function when you need standard errors and p-values
-#' for your treatment effect estimates.
+#' Run a vertical regression in stacked form with a treatment indicator D,
+#' as described in Liu, Shin, and Yamauchi (2024). Algebraically equivalent
+#' to \code{\link{vertreg}} but connects to the omitted variable bias framework
+#' and enables inference under additional assumptions.
 #'
 #' @param formula A character string or formula object specifying the vertical
 #'   regression model. The left-hand side should be the treated unit and the

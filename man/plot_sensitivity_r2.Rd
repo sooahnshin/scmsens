@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot.R
 \name{plot_sensitivity_r2}
 \alias{plot_sensitivity_r2}
-\title{Sensitivity Contour Plot with Partial R Squared}
+\title{Sensitivity Contour Plot (Partial R-squared)}
 \usage{
 plot_sensitivity_r2(
   tau_complete,
@@ -22,42 +22,65 @@ plot_sensitivity_r2(
 )
 }
 \arguments{
-\item{tau_complete}{Estimated treatment effect with the entire data.}
+\item{tau_complete}{Numeric value of the estimated treatment effect using
+all control units.}
 
-\item{df}{Degree of freedom of the vertical regression with the entire data.}
+\item{df}{Integer specifying the degrees of freedom from the vertical regression.
+Can be obtained from the output of \code{\link{vertreg_stacked}}.}
 
-\item{tau_se}{Standard error of the treatment effect with the entire data.}
+\item{tau_se}{Numeric value of the standard error of the treatment effect.
+Can be obtained from the output of \code{\link{vertreg_stacked}}.}
 
-\item{sign_bias}{Sign of the bias.}
+\item{sign_bias}{Integer value (1 or -1) indicating the sign of the bias to consider.
+Use 1 for positive bias scenarios and -1 for negative bias scenarios.}
 
-\item{var_x_r2_Y_Z}{Partial R squared of the control units with the outcome.}
+\item{var_x_r2_Y_Z}{Numeric vector of partial R-squared values for the outcome
+regression. Typically from \code{\link{estimate_params}}.}
 
-\item{var_x_r2_D_Z}{Partial R squared of the control units with the treatment indicator.}
+\item{var_x_r2_D_Z}{Numeric vector of partial R-squared values for the treatment
+indicator regression. Same length as \code{var_x_r2_Y_Z}.}
 
-\item{var_x_name}{Names of the control units.}
+\item{var_x_name}{Character vector of labels for each benchmark point.
+Same length as \code{var_x_r2_Y_Z}.}
 
-\item{title}{Title of the plot}
+\item{title}{Character string for the plot title. Default is \code{NULL} (no title).}
 
-\item{r2_Y_Z_seq}{Sequence of x values to plot.}
+\item{r2_Y_Z_seq}{Numeric vector specifying the range of R-squared values for the
+x-axis. Default is \code{seq(0, 1, length.out = 100)}.}
 
-\item{r2_D_Z_seq}{Sequence of y values to plot.}
+\item{r2_D_Z_seq}{Numeric vector specifying the range of R-squared values for the
+y-axis. Default is \code{seq(0, 1, length.out = 100)}.}
 
-\item{text_size}{Size of the text}
+\item{text_size}{Numeric value for the size of text labels. Default is 3.}
 
-\item{plot_t_stat}{Whether to plot t-statistic instead of bias. If true, \code{t_stat} argument should be provided.}
+\item{plot_t_stat}{Logical indicating whether to plot t-statistics on contours
+instead of treatment effects. If \code{TRUE}, the \code{t_stat} argument should
+also be provided. Default is \code{FALSE}.}
 
-\item{t_stat}{t-statistic of the treatment effect with the entire data.}
+\item{t_stat}{Numeric value of the t-statistic for the treatment effect (required
+only if \code{plot_t_stat = TRUE}).}
 
-\item{critical_value}{Critical value for the t-statistic contour line.}
+\item{critical_value}{Numeric value specifying a critical t-value for highlighting
+a significance threshold contour (e.g., 1.96 for 95\% confidence).
+If \code{NULL} (default), no critical value line is drawn.}
 }
 \value{
-ggplot2 object
+A ggplot2 object that can be further customized or printed.
 }
 \description{
-Generate a sensitivity contour plot of partial R squared with the estimated treatment effect, weights, and imbalance.
+Generate a sensitivity contour plot using partial R-squared values to assess
+how unobserved confounders with certain explanatory power could affect the
+treatment effect estimate. This approach follows the framework of Cinelli and
+Hazlett (2020).
+}
+\details{
+The x-axis shows the partial R-squared of the outcome regressed on the
+confounder (controlling for treatment and observed controls), while the y-axis
+shows the partial R-squared of the treatment indicator regressed on the
+confounder (controlling for observed controls).
 }
 \examples{
-# leave-one-out sensitivity analysis
+# First, fit the model to get df and standard error
 fit <- vertreg_stacked(formula = paste("Y ~ -1 + ",
                                        paste(paste0("X", 1:16),
                                              collapse = " + ")),
@@ -66,11 +89,14 @@ fit <- vertreg_stacked(formula = paste("Y ~ -1 + ",
                        pseudo_inverse = FALSE)
 df <- fit$df
 tau_se <- fit$std.error
+
+# Run leave-one-out analysis
 res <- estimate_params(var_y_name = "Y",
                        var_x_name = paste0("X", 1:16),
                        data_pre = synth_pre,
                        data_post = synth_post)
-# plot only top 5 units with positive bias
+
+# Plot only top 5 units with positive bias
 res <- res[order(-res$bias), ][1:5, ]
 tau_complete <- res |> dplyr::pull(tau) |> unique()
 var_x_r2_Y_Z <- res |> dplyr::pull(r2_Y_Z)
@@ -86,6 +112,12 @@ plot_sensitivity_r2(tau_complete = tau_complete, df = df, tau_se = tau_se,
                     text_size = 5)
 
 }
+\references{
+Cinelli, C., & Hazlett, C. (2020). Making sense of sensitivity: Extending
+omitted variable bias. \emph{Journal of the Royal Statistical Society:
+Series B}, 82(1), 39-67.
+}
 \seealso{
-\code{\link[=plot_sensitivity]{plot_sensitivity()}}
+\code{\link[=plot_sensitivity]{plot_sensitivity()}} for weight/imbalance plots,
+\code{\link[=estimate_params]{estimate_params()}} for generating the input data
 }

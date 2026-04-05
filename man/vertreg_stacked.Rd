@@ -7,35 +7,59 @@
 vertreg_stacked(formula, data_pre, data_post, pseudo_inverse = FALSE)
 }
 \arguments{
-\item{formula}{A string to specify the vertical regression model (e.g., "Y ~ X1 + X2" where "Y" is treated unit, "X1" and "X2" are control units).}
+\item{formula}{A character string or formula object specifying the vertical
+regression model. The left-hand side should be the treated unit and the
+right-hand side should include all control units. For example,
+\code{"Y ~ X1 + X2 + X3"}. The treatment indicator (D) is automatically added.}
 
-\item{data_pre}{Pre-period data where the rows are time points and the columns include treated/control units. See \code{synth_pre} for example.}
+\item{data_pre}{A data.frame, tibble, or matrix containing the pre-treatment period data.
+Rows represent time points and columns represent units. Must contain all
+variables specified in the formula. See \code{\link{synth_pre}} for an example.}
 
-\item{data_post}{Post-period data. Should have identical columns to data_pre. See \code{synth_post} for example.}
+\item{data_post}{A data.frame, tibble, or matrix containing the post-treatment period data.
+Must have the same column structure as \code{data_pre}. Can contain one or more
+post-treatment time periods. See \code{\link{synth_post}} for an example.}
 
-\item{pseudo_inverse}{A logical to indicate whether to use the pseudo-inverse to fit the model.}
+\item{pseudo_inverse}{Logical indicating whether to use the Moore-Penrose pseudo-inverse
+to fit the regression model. Default is \code{FALSE}.}
 }
 \value{
-A data.frame with the treatment effect and its standard error based on the vertical regression:
-\itemize{
-\item \code{time_from_treatment}: the time from the treatment
-\item \code{estimate}: the estimated treatment effect
-\item \code{std.error}: the standard error of the estimated treatment effect
-\item \code{statistic}: the t-statistic of the estimated treatment effect
-\item \code{p.value}: the p-value of the estimated treatment effect
-\item \code{df}: the degree of freedom of the regression
+A data.frame (tibble) with the following columns:
+\describe{
+\item{time_from_treatment}{Integer indicating the post-treatment period (1, 2, 3, ...)}
+\item{estimate}{The estimated treatment effect for that period}
+\item{std.error}{Standard error of the treatment effect estimate}
+\item{statistic}{The t-statistic for testing if the effect differs from zero}
+\item{p.value}{Two-sided p-value for the t-test}
+\item{df}{Degrees of freedom used in the regression}
 }
-
-@seealso \code{\link[=vertreg]{vertreg()}}
 }
 \description{
-Function to run a vertical regression in stacked form with a treatment indicator.
+Run a vertical regression in stacked form with a treatment indicator D,
+as described in Liu, Shin, and Yamauchi (2024). Algebraically equivalent
+to \code{\link{vertreg}} but connects to the omitted variable bias framework
+and enables inference under additional assumptions.
 }
 \examples{
+# Basic usage
 vertreg_stacked(
   formula = paste("Y ~ -1 + ", paste(paste0("X", 1:16), collapse = " + ")),
   data_pre = synth_pre,
   data_post = synth_post
 )
 
+# Access specific results
+result <- vertreg_stacked(
+  formula = "Y ~ X1 + X2 + X3 + X4",
+  data_pre = synth_pre,
+  data_post = synth_post
+)
+result$estimate    # Treatment effect
+result$std.error   # Standard error
+result$p.value     # P-value
+
+}
+\seealso{
+\code{\link{vertreg}} for estimates without standard errors,
+\code{\link{estimate_params}} for sensitivity analysis
 }

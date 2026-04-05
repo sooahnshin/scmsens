@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot.R
 \name{plot_sensitivity}
 \alias{plot_sensitivity}
-\title{Sensitivity Contour Plot}
+\title{Sensitivity Contour Plot (Weight and Imbalance)}
 \usage{
 plot_sensitivity(
   tau_complete,
@@ -22,57 +22,91 @@ plot_sensitivity(
 )
 }
 \arguments{
-\item{tau_complete}{Estimated treatment effect with the entire data.}
+\item{tau_complete}{Numeric value of the estimated treatment effect using
+all control units (the unadjusted estimate).}
 
-\item{var_x_gamma}{Weights of the control units.}
+\item{var_x_gamma}{Numeric vector of weights (gamma) for each control unit or
+benchmark point. These typically come from leave-one-out analysis via
+\code{\link{estimate_params}}.}
 
-\item{var_x_delta}{Imbalance of the control units.}
+\item{var_x_delta}{Numeric vector of imbalances (delta) for each control unit or
+benchmark point. Same length as \code{var_x_gamma}.}
 
-\item{var_x_name}{Names of the control units.}
+\item{var_x_name}{Character vector of labels for each point. Same length as
+\code{var_x_gamma}. Often includes the effect estimate, e.g.,
+\code{"Drop X1 (-2.3)"}.}
 
-\item{title}{Title of the plot}
+\item{title}{Character string for the plot title. Default is \code{NULL} (no title).}
 
-\item{gamma_seq}{Sequence of gamma values to plot.}
+\item{gamma_seq}{Numeric vector specifying the range of gamma values for the
+contour lines. If \code{NULL} (default), automatically determined from data.}
 
-\item{delta_seq}{Sequence of delta values to plot.}
+\item{delta_seq}{Numeric vector specifying the range of delta values for the
+contour lines. If \code{NULL} (default), automatically determined from data.}
 
-\item{text_size}{Size of the text}
+\item{text_size}{Numeric value for the size of text labels. Default is 3.}
 
-\item{nudge_x}{Nudge value for the x-axis text}
+\item{nudge_x}{Numeric value for horizontal offset of text labels. Default is 0.02.}
 
-\item{nudge_y}{Nudge value for the y-axis text}
+\item{nudge_y}{Numeric value for vertical offset of text labels. Default is 0.}
 
-\item{repel}{Whether to use \code{ggrepel::geom_text_repel()} for text labels.}
+\item{repel}{Logical indicating whether to use \code{ggrepel::geom_text_repel()}
+for automatic label positioning to avoid overlaps. Default is \code{FALSE}.}
 
-\item{tau_round}{Number of decimal places to round the treatment effect.}
+\item{tau_round}{Integer specifying the number of decimal places for rounding
+the treatment effect in the legend. Default is 1.}
 
-\item{nudge_x2}{Nudge value for the x-axis text of the treatment effect.}
+\item{nudge_x2}{Numeric value for horizontal offset of the unadjusted estimate label.
+If \code{NULL} (default), uses \code{nudge_x}.}
 
-\item{nudge_y2}{Nudge value for the y-axis text of the treatment effect.}
+\item{nudge_y2}{Numeric value for vertical offset of the unadjusted estimate label.
+If \code{NULL} (default), uses \code{nudge_y}.}
 }
 \value{
-ggplot2 object
+A ggplot2 object that can be further customized or printed.
 }
 \description{
-Generate a sensitivity contour plot with the estimated treatment effect, weights, and imbalance.
+Generate a contour plot to visualize how the treatment effect estimate changes
+based on the weight (gamma) and imbalance (delta) parameters of potential
+unobserved donor units. This is a key visualization for sensitivity analysis
+in the Synthetic Control Method framework.
+}
+\details{
+The contour lines show combinations of weight and imbalance that would result
+in the same adjusted treatment effect. Points representing dropped control units
+(from leave-one-out analysis) are plotted to show their contribution to potential bias.
 }
 \examples{
-# leave-one-out sensitivity analysis
+# Perform leave-one-out sensitivity analysis
 res <- estimate_params(var_y_name = "Y",
                        var_x_name = paste0("X", 1:16),
                        data_pre = synth_pre,
                        data_post = synth_post)
+
+# Extract parameters for plotting
 tau_complete <- res |> dplyr::pull(tau) |> unique()
 var_x_gamma <- res |> dplyr::pull(gamma)
 var_x_delta <- res |> dplyr::pull(delta)
 var_x_tau <- res |> dplyr::pull(estimate)
 var_x_name <- paste0("Drop ", paste0("X", 1:16), " (", round(var_x_tau, 1), ")")
-plot_sensitivity(tau_complete = tau_complete,
-                 var_x_gamma = var_x_gamma, var_x_delta = var_x_delta, var_x_name = var_x_name,
-                 title = "Sensitivity of the SCM Estimate", text_size = 4)
 
+# Create sensitivity plot
+plot_sensitivity(tau_complete = tau_complete,
+                 var_x_gamma = var_x_gamma,
+                 var_x_delta = var_x_delta,
+                 var_x_name = var_x_name,
+                 title = "Sensitivity of the SCM Estimate",
+                 text_size = 4)
+
+# Use repel for better label placement with many points
+plot_sensitivity(tau_complete = tau_complete,
+                 var_x_gamma = var_x_gamma,
+                 var_x_delta = var_x_delta,
+                 var_x_name = var_x_name,
+                 repel = TRUE)
 
 }
 \seealso{
-\code{\link[=plot_sensitivity_r2]{plot_sensitivity_r2()}}
+\code{\link[=plot_sensitivity_r2]{plot_sensitivity_r2()}} for R-squared based sensitivity plots,
+\code{\link[=estimate_params]{estimate_params()}} for generating the input data
 }

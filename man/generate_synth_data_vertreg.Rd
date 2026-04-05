@@ -2,7 +2,7 @@
 % Please edit documentation in R/synthetic_data.R
 \name{generate_synth_data_vertreg}
 \alias{generate_synth_data_vertreg}
-\title{Synthetic Data with Vanilla Vertical Regression}
+\title{Generate Synthetic Data with Vertical Regression Model}
 \usage{
 generate_synth_data_vertreg(
   t0 = 99,
@@ -14,35 +14,59 @@ generate_synth_data_vertreg(
 )
 }
 \arguments{
-\item{t0}{Numeric, the number of pre-treatment time periods (observations).}
+\item{t0}{Integer specifying the number of pre-treatment time periods.
+Default is 99.}
 
-\item{n}{Numeric, the number of donor units (variables).}
+\item{n}{Integer specifying the number of control (donor) units. Default is 20.}
 
-\item{tau}{Numeric, the value of ATT (Average Treatment Effect on the Treated).}
+\item{tau}{Numeric value specifying the true Average Treatment Effect on the
+Treated (ATT). Default is 10.}
 
-\item{rho}{Numeric, a parameter for non-overlap.}
+\item{rho}{Numeric parameter controlling the correlation among donor units.
+Larger values create stronger correlations. Default is 0.04.}
 
-\item{mu}{Numeric, another parameter for non-overlap.}
+\item{mu}{Numeric vector of length \code{n} specifying the mean values for each
+donor unit. If \code{NULL} (default), randomly generated from N(0, 2).}
 
-\item{beta}{Numeric vector, weights.}
+\item{beta}{Numeric vector of length \code{n} specifying the true weights (coefficients)
+for each donor unit. If \code{NULL} (default), randomly generated from N(0, 2).}
 }
 \value{
 A list containing the following elements:
-\itemize{
-\item \code{df_pre_full}: A tibble of complete pre-treatment data \eqn{(t0 \times (n+1))}. The last column is the observation for treated unit (\eqn{Y}).
-\item \code{df_prepost_full}: A tibble of complete pre- and post-treatment data \eqn{((t0+1) \times (n+1))}. The second to last column is the observation for treated unit (\eqn{Y}), and the last column is the treatment indicator (\eqn{D}). The last row is the post-treatment observation.
-\item \code{beta}: A numeric vector of weights.
-\item \code{tau}: A numeric value of ATT
-\item \code{.call}: The matched call.
+\describe{
+\item{df_pre_full}{A tibble of dimension (t0 x (n+1)) containing the pre-treatment
+data. Columns X1, X2, ..., Xn are the control units, and Y is the treated unit.}
+\item{df_prepost_full}{A tibble of dimension ((t0+1) x (n+2)) containing both
+pre- and post-treatment data. Includes a treatment indicator column D.
+The last row is the post-treatment observation.}
+\item{beta}{The numeric vector of weights used in data generation.}
+\item{tau}{The true ATT value.}
+\item{.call}{The matched call used to create this object.}
 }
 }
 \description{
-This function generates synthetic data based on a vanilla vertical regression model given a set of parameters.
-This method is designed to analyze data with a specified number of pre-treatment time periods and donor units,
-incorporating an ATT (Average Treatment Effect on the Treated) value and parameters for non-overlap.
+Generate synthetic panel data using a basic vertical regression model for
+simulation studies. The data generation process creates correlated control units
+with specified mean differences, which can be used to test sensitivity analysis
+methods under controlled conditions.
+}
+\details{
+The model generates outcomes as: \eqn{Y = X \beta + \epsilon}, where \eqn{X} are
+the control units drawn from a multivariate normal distribution.
 }
 \examples{
+# Generate synthetic data
 set.seed(123)
-synth <- generate_synth_data_vertreg(t0 = 99, n = 20, tau = 10, rho = 0.04, mu = NULL, beta = NULL)
+synth <- generate_synth_data_vertreg(t0 = 99, n = 20, tau = 10, rho = 0.04)
 
+# Access the pre-treatment data
+head(synth$df_pre_full)
+
+# The true effect is stored in the output
+synth$tau
+
+}
+\seealso{
+\code{\link{generate_synth_data_ar}} for AR model-based data,
+\code{\link{generate_synth_data_ife}} for interactive fixed effects model
 }
