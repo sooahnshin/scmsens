@@ -1,0 +1,1219 @@
+---
+title: "Simulation Study: Bias Correction with Missing Outcomes"
+subtitle: "Comprehensive Evaluation of Oracle vs Feasible Correction"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    code_folding: hide
+    theme: flatly
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 8,
+  fig.height = 5,
+  message = FALSE,
+  warning = FALSE
+)
+```
+
+# Introduction
+
+This simulation study evaluates the proposed bias decomposition and correction method using a Germany-calibrated factor model.
+
+## Purpose
+
+The simulation addresses two key questions:
+
+**Part A: Bias Decomposition Validation**
+
+> Does the decomposition $\hat{\gamma} \times \hat{\delta}$ accurately capture the actual deletion bias?
+
+Using the **infeasible (oracle)** estimates where we observe full data for the omitted unit, we verify that the decomposition correctly identifies the systematic bias component.
+
+**Part B: Feasible Correction Performance**
+
+> How well does correction using only **partially observed** data perform compared to the oracle?
+
+We compare the **feasible** correction (using only observed portions of the omitted donor's outcomes) to the **infeasible/oracle** benchmark to assess practical performance.
+
+## Estimators Compared
+
+| Estimator | Description |
+|-----------|-------------|
+| **Complete Observations** | Vertical regression using all available data (gold standard) |
+| **Complete gsynth** | Interactive fixed effects model (Xu 2017) using all available data |
+| **Unit-wise Deletion** | Excluding the unit with missing outcomes |
+| **Mean Imputation** | Imputing missing values with sample mean |
+| **Median Imputation** | Imputing missing values with sample median |
+| **Bias-corrected (Infeasible)** | Oracle benchmark using full data for omitted unit |
+| **Bias-corrected (Feasible)** | Proposed method using only partially observed data |
+
+The key distinction:
+
+- **Infeasible/Oracle**: Uses information unavailable under genuine missingness, but shows what is recoverable in principle
+- **Feasible**: Uses only the observed portion of the omitted donor's outcomes
+
+```{r packages}
+library(scmsens)
+library(dplyr)
+library(tidyr)
+library(tibble)
+library(ggplot2)
+library(stringr)
+library(purrr)
+library(ggrepel)
+library(gsynth)
+library(splines)
+library(furrr)
+library(knitr)
+library(metR)
+
+theme_set(theme_bw(base_size = 14) + theme(plot.title = element_text(hjust = 0.5)))
+
+# Consistent color palette for all estimators
+estimator_colors <- c(
+    "Complete Observations" = "#4DAF4A",      # Green
+    "Complete gsynth" = "#A65628",             # Brown
+    "Unit-wise Deletion" = "#984EA3",          # Purple
+    "Mean Imputation" = "#FF7F00",             # Orange
+    "Median Imputation" = "#E6AB02",           # Gold
+    "Bias-corrected (Infeasible)" = "#377EB8", # Blue
+    "Bias-corrected (Feasible)" = "#E41A1C"    # Red
+)
+```
+
+# Data-Generating Process
+
+## Overview
+
+The DGP is calibrated to the **West German reunification** example:
+
+1. Fit a **two-factor interactive fixed effects (IFE)** model to the Germany data
+2. **Augment** the estimated factors using spline models with stochastic noise
+3. Select factor loadings from a subset of countries (Austria, USA, Japan, UK)
+4. Generate synthetic data with **99 pre-treatment periods** and **1 post-treatment period**
+5. Set the **true treatment effect to zero**
+
+## Missingness Design
+
+- **50% of pre-treatment periods** are set to missing for the omitted donor(s)
+- Missingness pattern: `c(1:25, 51:75)` (two blocks)
+- This represents a challenging but realistic scenario
+
+```{r helper-functions}
+#' Run IFE simulation for a single dataset
+run_ife_simulation <- function(synth_ife, miss_index = 1:50, k = 2, include_gsynth = FALSE) {
+    if (!isTRUE(class(synth_ife) == "synth_ife")) {
+        stop("synth_ife should be a synth_ife object")
+    }
+
+    tau_true <- synth_ife$tau
+    df_pre <- synth_ife$df_pre_full
+    t0 <- nrow(df_pre)
+    n_control <- ncol(df_pre) - 1
+    df_post <- synth_ife$df_prepost_full[(t0 + 1), ]
+    donor_units <- paste0("X", 1:n_control)
+
+    # Fit vertical regression with entire data (benchmark)
+    tau_complete <- vertreg(
+        formula = paste("Y ~", paste0("X", 1:n_control, collapse = "+")),
+        data_pre = df_pre,
+        data_post = df_post |> select(-D)
+    )
+
+    # Fit gsynth with entire data (optional comparator)
+    if (isTRUE(include_gsynth)) {
+        df_pre_long <- df_pre %>%
+            mutate(time = 1:nrow(.)) |>
+            pivot_longer(cols = -time, names_to = "unit", values_to = "outcome")
+        df_prepost_long <- df_post |>
+            select(-D) |>
+            mutate(time = t0 + 1) |>
+            pivot_longer(cols = -time, names_to = "unit", values_to = "outcome") |>
+            mutate(treat = if_else(unit == "Y", 1, 0)) |>
+            bind_rows(df_pre_long |> mutate(treat = 0))
+        complete_gsynth_mod <- gsynth::gsynth(outcome ~ treat,
+            data = df_prepost_long,
+            index = c("unit", "time"),
+            force = "none",
+            CV = TRUE, r = c(0, 2),
+            se = FALSE, inference = "parametric"
+        )
+        tau_gsynth <- complete_gsynth_mod$att.avg
+    } else {
+        tau_gsynth <- NA
+    }
+
+    # Generate all possible missing combinations
+    combinations_result <- combn(donor_units, k, simplify = FALSE)
+
+    # Compute vertical regression results for each combination
+    res_vert <- map(combinations_result, get_vertreg_results,
+        miss_index = miss_index,
+        df_pre = df_pre,
+        df_post = df_post,
+        n_control = n_control,
+        t0 = t0,
+        tau_true = tau_true,
+        tau_complete = tau_complete
+    ) %>% bind_rows()
+
+    # Combine with benchmark results
+    sim_res <- data.frame(
+        estimator = c("True Effect", "Complete Observations", "Complete gsynth"),
+        tau = c(tau_true, tau_complete, tau_gsynth),
+        tau_true = tau_true,
+        tau_complete = tau_complete,
+        gamma = c(NA, NA, NA),
+        delta = c(NA, NA, NA),
+        bias_est = c(NA, NA, NA),
+        missing_var = NA,
+        is_infeasible = NA,
+        stringsAsFactors = FALSE
+    ) |> bind_rows(res_vert)
+
+    return(sim_res)
+}
+
+#' Compute vertical regression results with missing values
+get_vertreg_results <- function(miss_var_name, miss_index, df_pre, df_post,
+                                 n_control, t0, tau_true, tau_complete) {
+    single_miss_flag <- isTRUE(length(miss_var_name) == 1)
+
+    # Introduce missing values
+    walk(miss_var_name, ~ {
+        df_pre <<- df_pre %>%
+            mutate("{.x}_miss" := if_else(row_number() %in% miss_index, NA_real_, !!sym(.x)))
+    })
+    walk(miss_var_name, ~ {
+        df_post <<- df_post %>%
+            mutate("{.x}_miss" := !!sym(.x))
+    })
+
+    obs_var_names <- paste0("X", 1:n_control) |> setdiff(miss_var_name)
+
+    # Unit-wise Deletion
+    tau_deletion <- vertreg(
+        formula = paste("Y ~", paste0(obs_var_names, collapse = "+")),
+        data_pre = df_pre,
+        data_post = df_post |> select(-D)
+    )
+
+    # Bias Estimation
+    if (single_miss_flag) {
+        bias_est_infeasible <- estimate_params_partial(
+            fm_z_on_x = paste(miss_var_name, "~ -1 +", paste0(obs_var_names, collapse = "+")),
+            fm_y_on_z_and_x = paste0("Y ~ -1 +", paste0(c(obs_var_names, miss_var_name), collapse = "+")),
+            data_pre = df_pre,
+            data_post = df_post |> select(-D)
+        )
+        bias_est_feasible <- estimate_params_partial(
+            fm_z_on_x = paste(paste0(miss_var_name, "_miss"), "~ -1 +", paste0(obs_var_names, collapse = "+")),
+            fm_y_on_z_and_x = paste0("Y ~ -1 +", paste0(miss_var_name, "_miss"), "+", paste0(obs_var_names, collapse = "+")),
+            data_pre = df_pre,
+            data_post = df_post |> select(-D)
+        )
+        delta_infeasible <- bias_est_infeasible$delta
+        delta_feasible <- bias_est_feasible$delta
+    } else {
+        bias_est_infeasible <- estimate_params_partial_multi(
+            var_z_name = miss_var_name,
+            var_x_name = obs_var_names,
+            var_y_name = "Y",
+            data_pre = df_pre,
+            data_post = df_post |> select(-D)
+        )
+        bias_est_feasible <- estimate_params_partial_multi(
+            var_z_name = paste0(miss_var_name, "_miss"),
+            var_x_name = obs_var_names,
+            var_y_name = "Y",
+            data_pre = df_pre,
+            data_post = df_post |> select(-D)
+        )
+        delta_infeasible <- bias_est_infeasible$imbalance
+        delta_feasible <- bias_est_feasible$imbalance
+    }
+
+    # Imputation
+    df_pre_long <- df_pre %>%
+        mutate(time = 1:nrow(.)) |>
+        pivot_longer(cols = -time, names_to = "unit", values_to = "outcome") |>
+        filter(!unit %in% miss_var_name)
+    df_prepost_long <- df_post |>
+        select(-D) |>
+        mutate(time = t0 + 1) |>
+        pivot_longer(cols = -time, names_to = "unit", values_to = "outcome") |>
+        filter(!unit %in% miss_var_name) |>
+        mutate(treat = if_else(unit == "Y", 1, 0)) |>
+        bind_rows(df_pre_long |> mutate(treat = 0))
+
+    # Mean imputation
+    df_prepost_long_mean <- df_prepost_long |>
+        group_by(unit) |>
+        mutate(outcome = if_else(is.na(outcome), mean(outcome, na.rm = TRUE), outcome)) |>
+        ungroup()
+    df_pre_mean <- df_prepost_long_mean |> filter(time <= t0) |> select(-treat) |>
+        pivot_wider(names_from = "unit", values_from = "outcome") |> select(-time)
+    df_post_mean <- df_prepost_long_mean |> filter(time > t0) |> select(-treat) |>
+        pivot_wider(names_from = "unit", values_from = "outcome") |> select(-time)
+
+    tau_mean_imp <- vertreg(
+        formula = paste("Y ~", paste0(obs_var_names, collapse = "+"), "+",
+                        paste0(paste0(miss_var_name, "_miss"), collapse = "+")),
+        data_pre = df_pre_mean,
+        data_post = df_post_mean |> as.data.frame()
+    )
+
+    # Median imputation
+    df_prepost_long_median <- df_prepost_long |>
+        group_by(unit) |>
+        mutate(outcome = if_else(is.na(outcome), median(outcome, na.rm = TRUE), outcome)) |>
+        ungroup()
+    df_pre_median <- df_prepost_long_median |> filter(time <= t0) |> select(-treat) |>
+        pivot_wider(names_from = "unit", values_from = "outcome") |> select(-time)
+    df_post_median <- df_prepost_long_median |> filter(time > t0) |> select(-treat) |>
+        pivot_wider(names_from = "unit", values_from = "outcome") |> select(-time)
+
+    tau_median_imp <- vertreg(
+        formula = paste("Y ~", paste0(obs_var_names, collapse = "+"), "+",
+                        paste0(paste0(miss_var_name, "_miss"), collapse = "+")),
+        data_pre = df_pre_median,
+        data_post = df_post_median |> as.data.frame()
+    )
+
+    # Combine Results
+    missing_var_label <- paste0(miss_var_name, collapse = ", ")
+
+    res <- bind_rows(
+        data.frame(estimator = "Unit-wise Deletion", tau = tau_deletion,
+                   tau_true = tau_true, tau_complete = tau_complete,
+                   gamma = NA_real_, delta = NA_real_, bias_est = NA_real_,
+                   missing_var = missing_var_label, is_infeasible = NA),
+        data.frame(estimator = "Mean Imputation", tau = tau_mean_imp,
+                   tau_true = tau_true, tau_complete = tau_complete,
+                   gamma = NA_real_, delta = NA_real_, bias_est = NA_real_,
+                   missing_var = missing_var_label, is_infeasible = NA),
+        data.frame(estimator = "Median Imputation", tau = tau_median_imp,
+                   tau_true = tau_true, tau_complete = tau_complete,
+                   gamma = NA_real_, delta = NA_real_, bias_est = NA_real_,
+                   missing_var = missing_var_label, is_infeasible = NA),
+        data.frame(estimator = "Bias-corrected (Infeasible)",
+                   tau = tau_deletion - bias_est_infeasible$bias,
+                   tau_true = tau_true, tau_complete = tau_complete,
+                   gamma = bias_est_infeasible$gamma, delta = delta_infeasible,
+                   bias_est = bias_est_infeasible$bias,
+                   missing_var = missing_var_label, is_infeasible = TRUE),
+        data.frame(estimator = "Bias-corrected (Feasible)",
+                   tau = tau_deletion - bias_est_feasible$bias,
+                   tau_true = tau_true, tau_complete = tau_complete,
+                   gamma = bias_est_feasible$gamma, delta = delta_feasible,
+                   bias_est = bias_est_feasible$bias,
+                   missing_var = missing_var_label, is_infeasible = FALSE)
+    )
+    return(res)
+}
+
+#' Replace X labels with country names
+replace_labels <- function(x, labels) {
+    sapply(str_split(x, ",\\s*"), function(v) paste(labels[v], collapse = ", "))
+}
+
+#' Compute summary statistics
+compute_summary_stats <- function(results, tau_true = 0) {
+    results |>
+        group_by(estimator) |>
+        summarise(
+            n = n(),
+            mean_tau = mean(tau, na.rm = TRUE),
+            mean_bias = mean(tau - tau_true, na.rm = TRUE),
+            sd = sd(tau, na.rm = TRUE),
+            rmse = sqrt(mean((tau - tau_true)^2, na.rm = TRUE)),
+            mae = mean(abs(tau - tau_true), na.rm = TRUE),
+            .groups = "drop"
+        ) |>
+        arrange(rmse)
+}
+
+#' Compute scenario-specific statistics
+compute_scenario_stats <- function(results, tau_true = 0) {
+    results |>
+        filter(!is.na(missing_var)) |>
+        group_by(missing_var, estimator) |>
+        summarise(
+            rmse = sqrt(mean((tau - tau_true)^2, na.rm = TRUE)),
+            mean_bias = mean(tau - tau_true, na.rm = TRUE),
+            .groups = "drop"
+        )
+}
+
+#' Compute gap-recovered statistics
+compute_gap_recovered <- function(results, tau_true = 0) {
+    scenario_stats <- results |>
+        filter(!is.na(missing_var)) |>
+        group_by(missing_var, estimator) |>
+        summarise(rmse = sqrt(mean((tau - tau_true)^2, na.rm = TRUE)), .groups = "drop") |>
+        pivot_wider(names_from = estimator, values_from = rmse)
+
+    scenario_stats |>
+        mutate(
+            deletion_gap = `Unit-wise Deletion` - `Bias-corrected (Infeasible)`,
+            feasible_improvement = `Unit-wise Deletion` - `Bias-corrected (Feasible)`,
+            gap_recovered_pct = if_else(
+                deletion_gap > 0,
+                feasible_improvement / deletion_gap * 100,
+                NA_real_
+            )
+        ) |>
+        select(missing_var,
+               rmse_deletion = `Unit-wise Deletion`,
+               rmse_infeasible = `Bias-corrected (Infeasible)`,
+               rmse_feasible = `Bias-corrected (Feasible)`,
+               gap_recovered_pct)
+}
+```
+
+# Part 1: Fit IFE Model to West Germany Data
+
+```{r fit-ife, cache=TRUE}
+data("wgermany")
+
+wgermany_long <- wgermany |>
+    pivot_longer(cols = !(year | Dt), names_to = "country", values_to = "gdp") |>
+    mutate(treat = if_else(year >= 1990 & country == "West Germany", 1, 0))
+
+set.seed(123)
+gsynth_fit <- gsynth(gdp ~ treat,
+    data = wgermany_long,
+    index = c("country", "year"),
+    force = "none",
+    CV = TRUE, r = c(0, 2),
+    se = TRUE, inference = "parametric", nboots = 1000,
+    parallel = FALSE
+)
+
+wgerm_factor <- gsynth_fit$factor
+wgerm_loading <- rbind(gsynth_fit$lambda.co, gsynth_fit$lambda.tr) |>
+    as.data.frame()
+```
+
+```{r plot-loadings, fig.cap="Factor loadings from the IFE model fitted to West Germany data"}
+wgerm_loading %>%
+    mutate(unit = rownames(.)) |>
+    mutate(treat = if_else(unit == "West Germany", "Treated", "Control")) |>
+    ggplot(aes(x = r1, y = r2, color = treat)) +
+    scale_color_manual(name = "Group", values = c("black", "indianred")) +
+    geom_point(size = 3) +
+    geom_label_repel(aes(label = unit), box.padding = 0.35, point.padding = 0.5) +
+    labs(title = "Factor Loadings", x = "Factor 1", y = "Factor 2") +
+    theme(legend.position = "none")
+```
+
+# Part 2: Augment Factors
+
+```{r augment-factors}
+factor_df <- data.frame(
+    time = 1:nrow(wgerm_factor),
+    factor1 = wgerm_factor[, 1],
+    factor2 = wgerm_factor[, 2]
+)
+
+mod_factor1 <- lm(factor1 ~ bs(time, df = 5), data = factor_df)
+mod_factor2 <- lm(factor2 ~ bs(time, df = 6), data = factor_df)
+
+pre_time <- -c(rev(seq(0, floor((99 - nrow(wgerm_factor)) * (3 / 4)))))
+post_time <- seq(nrow(wgerm_factor) + 1, length = round((99 - nrow(wgerm_factor)) / 4))
+
+set.seed(123)
+aug_factor1 <- predict(mod_factor1, newdata = data.frame(time = c(pre_time, post_time))) +
+    rnorm(length(c(pre_time, post_time)), 0, 100)
+aug_factor2 <- predict(mod_factor2, newdata = data.frame(time = c(pre_time, post_time))) +
+    rnorm(length(c(pre_time, post_time)), 0, 100)
+
+aug_factor_df <- rbind(
+    factor_df,
+    data.frame(time = c(pre_time, post_time), factor1 = aug_factor1, factor2 = aug_factor2)
+) |> arrange(time)
+```
+
+```{r plot-factors, fig.cap="Augmented factors (gray region = original Germany data)"}
+aug_factor_df |>
+    pivot_longer(-time, names_to = "factors", values_to = "value") |>
+    mutate(factors = str_remove(factors, "factor")) |>
+    mutate(time = time - min(time) + 1) |>
+    ggplot(aes(x = time, y = value, color = factors)) +
+    geom_rect(aes(xmin = length(pre_time) + 1, xmax = length(pre_time) + nrow(wgerm_factor),
+                  ymin = -Inf, ymax = Inf),
+              fill = "grey90", color = NA, alpha = 0.03) +
+    geom_line() +
+    labs(title = "Augmented Factors", x = "Time", y = "Value") +
+    scale_color_brewer(NULL, type = "qual", palette = "Set1") +
+    theme(legend.position = "bottom")
+```
+
+# Part 3: Monte Carlo Simulation
+
+```{r simulation-setup}
+# Subset to selected countries
+selected_units <- c("Austria", "USA", "Japan", "UK", "West Germany")
+names(selected_units) <- paste0("X", 1:length(selected_units))
+
+loading_df <- wgerm_loading %>% filter(rownames(.) %in% selected_units)
+
+n_control <- nrow(loading_df) - 1
+t0 <- nrow(aug_factor_df) - 1
+phi <- loading_df |> as.matrix()
+mu <- rbind(aug_factor_df$factor1, aug_factor_df$factor2)
+
+tau_true <- 0
+miss_index <- c(1:25, 51:75)  # Two blocks, 50% missing
+sim_size <- 1000
+```
+
+**Simulation Parameters:**
+
+- Pre-treatment periods: `r t0`
+- Control units: `r n_control` (Austria, USA, Japan, UK) — the three largest-weight donors from the original Abadie et al. study plus UK
+- True treatment effect: `r tau_true`
+- Missingness: 50% (periods 1-25 and 51-75)
+- Monte Carlo iterations: `r sim_size`
+
+### What is Fixed vs Randomized
+
+**Fixed across all iterations:**
+
+| Component | Description | Source |
+|-----------|-------------|--------|
+| Factor loadings ($\phi$) | Unit-specific weights on latent factors | Estimated from West Germany data via `gsynth` |
+| Time factors ($\mu$) | Two latent factors over 100 time periods | Original from Germany (t=43-87) + spline extrapolation with fixed seed |
+| True treatment effect ($\tau$) | Set to 0 for bias evaluation | Design choice |
+| Pre-treatment periods ($T_0$) | 99 periods | Design choice |
+| Missingness pattern | Periods 1-25 and 51-75 (50% missing) | Design choice |
+| Selected units | Austria, USA, Japan, UK + West Germany | Top-weighted donors from original study |
+
+**Randomized in each iteration:**
+
+| Component | Description | How |
+|-----------|-------------|-----|
+| Idiosyncratic noise ($\varepsilon_{it}$) | Unit-time specific shocks | `rnorm()` with seed = iteration number |
+| Omitted unit scenario | Which control unit has missing data | All 4 units are tested in each iteration |
+
+**Data Generating Process:**
+
+Each simulated outcome is generated as:
+$$Y_{it} = \phi_i' \mu_t + \varepsilon_{it}$$
+
+where:
+
+- $\phi_i$ = factor loadings for unit $i$ (fixed, from Germany estimation)
+- $\mu_t$ = time factors at period $t$ (fixed, augmented from Germany)
+- $\varepsilon_{it} \sim N(0, \sigma^2)$ = idiosyncratic noise (randomized each iteration)
+
+The treatment effect for the treated unit (West Germany) at $t = T_0 + 1$ is set to $\tau = 0$.
+
+**Missingness Design:**
+
+For each omitted unit, we observe outcomes only for periods **26-50** and **76-99** (the "partially observed" data). This creates a challenging scenario where:
+
+- The feasible correction must estimate bias using only 50% of the omitted unit's pre-treatment data
+- The oracle/infeasible correction uses all 99 pre-treatment periods
+
+```{r run-simulation, cache=TRUE}
+plan(multisession)
+
+# Single-unit missing (k = 1)
+res_drop1_raw <- future_map(1:sim_size, function(seed) {
+    set.seed(seed)
+    synth_ife_data <- generate_synth_data_ife(
+        t0 = t0, n = n_control, tau = tau_true, phi = phi, mu = mu
+    )
+    res <- run_ife_simulation(synth_ife_data, miss_index = miss_index, k = 1, include_gsynth = TRUE)
+    res |> mutate(
+        id = seed,
+        missing_var = if_else(is.na(missing_var), missing_var,
+                              replace_labels(missing_var, selected_units))
+    )
+}, .options = furrr_options(seed = NULL), .progress = TRUE) |> bind_rows()
+
+# Multi-unit missing (k = 2)
+res_drop2_raw <- future_map(1:sim_size, function(seed) {
+    set.seed(seed)
+    synth_ife_data <- generate_synth_data_ife(
+        t0 = t0, n = n_control, tau = tau_true, phi = phi, mu = mu
+    )
+    res <- run_ife_simulation(synth_ife_data, miss_index = miss_index, k = 2, include_gsynth = TRUE)
+    res |> mutate(
+        id = seed,
+        missing_var = if_else(is.na(missing_var), missing_var,
+                              replace_labels(missing_var, selected_units))
+    )
+}, .options = furrr_options(seed = NULL), .progress = TRUE) |> bind_rows()
+```
+
+# Results: Single Missing Unit (k = 1)
+
+We organize the results into two parts:
+
+- **Part A**: Does the bias decomposition accurately capture deletion bias? (Theory validation)
+- **Part B**: Does correction using partial data work? (Practical utility)
+
+## Overall Performance
+
+```{r table-single-overall}
+tab_single_overall <- compute_summary_stats(res_drop1_raw, tau_true)
+
+tab_single_overall |>
+    filter(estimator != "True Effect") |>
+    kable(digits = 3, caption = "Overall Performance: Single Missing Unit")
+```
+
+**Note on sample sizes (n):** Complete Observations and Complete gsynth have n=1000 (one per simulation) because they use all data regardless of which unit is "missing." Other estimators have n=4000 because there are 4 possible omitted units × 1000 simulations.
+
+**Note on gsynth performance:** gsynth is designed for settings with more units where factor estimation is reliable. In this simulation with only 5 units (4 controls + 1 treated), factor estimation is challenging and cross-validation for selecting the number of factors may be unstable. In applications with larger donor pools, results may change.
+
+**Note on mean_bias vs MAE:** The `mean_bias` for Unit-wise Deletion appears near zero because positive biases (from dropping some units) cancel with negative biases (from dropping others) when averaged. The `mae` (Mean Absolute Error) better captures the typical error magnitude.
+
+## Figure: Distribution of Estimates
+
+```{r fig-boxplot-single, fig.width=9, fig.height=6, fig.cap="Box plots showing distribution of treatment effect estimates across 1000 simulations"}
+plot_order <- c("Complete Observations", "Complete gsynth", "Unit-wise Deletion",
+                "Mean Imputation", "Median Imputation",
+                "Bias-corrected (Infeasible)", "Bias-corrected (Feasible)")
+
+res_drop1_raw |>
+    filter(estimator %in% plot_order) |>
+    mutate(estimator = factor(estimator, levels = rev(plot_order))) |>
+    ggplot(aes(x = estimator, y = tau, fill = estimator)) +
+    geom_boxplot(outlier.alpha = 0.3, show.legend = FALSE) +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed", linewidth = 1) +
+    coord_flip() +
+    scale_fill_manual(values = estimator_colors) +
+    labs(x = NULL, y = "Treatment Effect Estimate (τ)",
+         title = "Distribution of Estimates: Single Missing Unit",
+         subtitle = "Red dashed line = true effect (0)") +
+    theme(axis.text.y = element_text(size = 11))
+```
+
+## Bias-Variance Decomposition by Scenario
+
+Since RMSE² = Bias² + Variance, we can decompose the error for each omitted unit scenario:
+
+```{r fig-bias-variance, fig.width=12, fig.height=6, fig.cap="Bias-variance decomposition of MSE by omitted unit scenario."}
+# Compute bias-variance by scenario
+bv_by_scenario <- res_drop1_raw |>
+    filter(estimator %in% c("Unit-wise Deletion", "Bias-corrected (Infeasible)", "Bias-corrected (Feasible)")) |>
+    group_by(estimator, missing_var) |>
+    summarise(
+        mean_bias = mean(tau),
+        bias_sq = mean(tau)^2,
+        variance = var(tau),
+        .groups = "drop"
+    )
+
+# Add Complete Observations (same for all scenarios)
+complete_stats <- res_drop1_raw |>
+    filter(estimator == "Complete Observations") |>
+    summarise(
+        mean_bias = mean(tau),
+        bias_sq = mean(tau)^2,
+        variance = var(tau)
+    )
+
+# Expand Complete Observations to all scenarios for comparison
+complete_expanded <- expand.grid(
+    estimator = "Complete Observations",
+    missing_var = unique(bv_by_scenario$missing_var)
+) |>
+    mutate(
+        mean_bias = complete_stats$mean_bias,
+        bias_sq = complete_stats$bias_sq,
+        variance = complete_stats$variance
+    )
+
+bv_all <- bind_rows(bv_by_scenario, complete_expanded) |>
+    mutate(estimator = factor(estimator,
+           levels = rev(c("Complete Observations", "Unit-wise Deletion",
+                          "Bias-corrected (Infeasible)", "Bias-corrected (Feasible)"))))
+
+bv_all |>
+    select(estimator, missing_var, `Bias²` = bias_sq, Variance = variance) |>
+    pivot_longer(c(`Bias²`, Variance), names_to = "Component", values_to = "value") |>
+    mutate(Component = factor(Component, levels = c("Variance", "Bias²"))) |>
+    ggplot(aes(x = estimator, y = value, fill = Component)) +
+    geom_col() +
+    coord_flip() +
+    facet_wrap(~ missing_var, nrow = 1) +
+    scale_fill_manual(values = c("Bias²" = "indianred", "Variance" = "steelblue")) +
+    labs(x = NULL, y = "MSE (Bias² + Variance)",
+         title = "Bias-Variance Decomposition by Scenario") +
+    theme(legend.position = "bottom",
+          axis.text.y = element_text(size = 9))
+```
+
+---
+
+## Part A: Bias Decomposition Validation
+
+**Question:** Does the decomposition $\hat{\gamma} \times \hat{\delta}$ accurately capture the actual deletion bias?
+
+This uses the **infeasible (oracle)** estimates where we observe the full data for the omitted unit.
+
+### Sensitivity Plot with Oracle Estimates
+
+Using `plot_sensitivity()` from the scmsens package, we show the **mean** oracle estimates for each omitted unit. The contour lines show the adjusted treatment effect at each (γ, δ) combination.
+
+```{r fig-sensitivity-package, fig.width=9, fig.height=7, fig.cap="Sensitivity plot using scmsens::plot_sensitivity() with mean oracle estimates for each omitted unit."}
+# Get oracle estimates
+oracle_data <- res_drop1_raw |>
+    filter(estimator == "Bias-corrected (Infeasible)") |>
+    select(id, missing_var, gamma, delta, bias_est)
+
+# Compute mean oracle estimates for each omitted unit
+oracle_summary <- oracle_data |>
+    group_by(missing_var) |>
+    summarise(
+        mean_gamma = mean(gamma),
+        mean_delta = mean(delta),
+        mean_bias = mean(bias_est),
+        .groups = "drop"
+    )
+
+# Get tau_complete (should be consistent across simulations)
+tau_complete_val <- res_drop1_raw |>
+    filter(estimator == "Complete Observations") |>
+    pull(tau) |>
+    mean()
+
+# Use plot_sensitivity from scmsens and add contour labels
+p <- plot_sensitivity(
+    tau_complete = tau_complete_val,
+    var_x_gamma = oracle_summary$mean_gamma,
+    var_x_delta = oracle_summary$mean_delta,
+    var_x_name = paste0(oracle_summary$missing_var, " (bias=", round(oracle_summary$mean_bias, 2), ")"),
+    title = "Sensitivity Plot: Mean Oracle Estimates",
+    repel = TRUE,
+    text_size = 4
+)
+
+# Add contour labels using metR
+gamma_seq <- seq(round(min(oracle_summary$mean_gamma), 0) - 0.5,
+                 round(max(oracle_summary$mean_gamma), 0) + 0.5, length.out = 100)
+delta_seq <- seq(round(min(oracle_summary$mean_delta), 0) - 0.5,
+                 round(max(oracle_summary$mean_delta), 0) + 0.5, length.out = 100)
+sens_df <- expand.grid(gamma = gamma_seq, delta = delta_seq) |>
+    mutate(tau_adj = tau_complete_val + gamma * delta)
+
+p + metR::geom_text_contour(data = sens_df, aes(x = gamma, y = delta, z = tau_adj),
+                            stroke = 0.2, size = 3, skip = 1)
+```
+
+### Sensitivity Plot with Simulation Scatter
+
+To show the variability across simulations, we overlay all oracle points on the sensitivity contours:
+
+```{r fig-sensitivity-scatter, fig.width=10, fig.height=8, fig.cap="Sensitivity contour plot with all simulation oracle estimates overlaid."}
+# Create grid for contours
+gamma_range <- range(oracle_data$gamma, na.rm = TRUE)
+delta_range <- range(oracle_data$delta, na.rm = TRUE)
+
+gamma_seq <- seq(gamma_range[1] - 0.1, gamma_range[2] + 0.1, length.out = 100)
+delta_seq <- seq(delta_range[1] - 1, delta_range[2] + 1, length.out = 100)
+
+contour_grid <- expand.grid(gamma = gamma_seq, delta = delta_seq) |>
+    mutate(tau_adj = tau_complete_val + gamma * delta)
+
+# Plot with package-style contours (showing adjusted tau, not just bias)
+ggplot() +
+    geom_vline(xintercept = 0, color = "black", alpha = 0.1) +
+    geom_hline(yintercept = 0, color = "black", alpha = 0.1) +
+    # Contour lines (adjusted treatment effect)
+    geom_contour(data = contour_grid, aes(x = gamma, y = delta, z = tau_adj),
+                 color = "black", alpha = 0.5) +
+    metR::geom_text_contour(data = contour_grid, aes(x = gamma, y = delta, z = tau_adj),
+                            stroke = 0.2, size = 3, skip = 1) +
+    # Simulation points (background)
+    geom_point(data = oracle_data, aes(x = gamma, y = delta, color = missing_var),
+               alpha = 0.3, size = 1) +
+    # Mean oracle points (foreground)
+    geom_point(data = oracle_summary, aes(x = mean_gamma, y = mean_delta),
+               size = 4, shape = 17, color = "black") +
+    ggrepel::geom_text_repel(
+        data = oracle_summary,
+        aes(x = mean_gamma, y = mean_delta, label = missing_var),
+        size = 4, fontface = "bold"
+    ) +
+    # Unadjusted estimate at origin
+    geom_point(aes(x = 0, y = 0), shape = 17, color = "#990000", size = 4) +
+    annotate("text", x = 0.05, y = 0.1,
+             label = paste0("Unadjusted (", round(tau_complete_val, 2), ")"),
+             color = "#990000", hjust = 0, size = 4) +
+    scale_color_brewer(palette = "Set1") +
+    labs(x = expression(hat(gamma) ~ "(Weight)"),
+         y = expression(hat(delta) ~ "(Imbalance)"),
+         color = "Omitted Unit",
+         title = "Sensitivity Plot with All Simulation Estimates",
+         subtitle = "Contours show adjusted τ; small points = simulations; triangles = means") +
+    theme(legend.position = "bottom",
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank())
+```
+
+**Interpretation:**
+- Contour lines show the **adjusted treatment effect** at each (γ, δ) combination
+- Small points show oracle estimates from each simulation (clustering = consistency)
+- Triangles show mean estimates for each omitted unit
+- The red triangle at origin shows the unadjusted (complete observations) estimate
+
+### Decomposition Accuracy
+
+```{r fig-bias-scatter, fig.width=8, fig.height=6, fig.cap="Scatter plot showing actual deletion bias vs estimated bias from the decomposition. Points on the 45-degree line indicate perfect decomposition accuracy."}
+deletion_data <- res_drop1_raw |>
+    filter(estimator == "Unit-wise Deletion") |>
+    select(id, missing_var, tau_deletion = tau, tau_complete)
+
+infeasible_data <- res_drop1_raw |>
+    filter(estimator == "Bias-corrected (Infeasible)") |>
+    select(id, missing_var, bias_est_infeasible = bias_est)
+
+plot_data_A <- deletion_data |>
+    left_join(infeasible_data, by = c("id", "missing_var")) |>
+    mutate(actual_deletion_bias = tau_deletion - tau_complete)
+
+ggplot(plot_data_A, aes(x = actual_deletion_bias, y = bias_est_infeasible)) +
+    geom_point(alpha = 0.3, color = "steelblue") +
+    geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed", linewidth = 1) +
+    labs(x = "Actual Deletion Bias (τ_deletion - τ_complete)",
+         y = "Estimated Bias from Decomposition (γ × δ)",
+         title = "Part A: Does the Decomposition Capture Deletion Bias?",
+         subtitle = "Using infeasible (oracle) estimates with full data") +
+    coord_fixed() +
+    facet_wrap(~ missing_var, ncol = 2)
+```
+
+### Decomposition Accuracy Statistics
+
+```{r table-decomposition-accuracy}
+decomp_accuracy <- plot_data_A |>
+    group_by(missing_var) |>
+    summarise(
+        correlation = cor(actual_deletion_bias, bias_est_infeasible),
+        mean_actual_bias = mean(actual_deletion_bias),
+        mean_estimated_bias = mean(bias_est_infeasible),
+        rmse_decomposition = sqrt(mean((actual_deletion_bias - bias_est_infeasible)^2)),
+        .groups = "drop"
+    )
+
+decomp_accuracy |>
+    kable(digits = 3, caption = "Decomposition Accuracy: How well does γ×δ capture actual deletion bias?")
+```
+
+**Interpretation:** Correlation close to 1 and low RMSE indicate the decomposition accurately captures the systematic deletion bias.
+
+---
+
+## Part B: Feasible Correction Performance
+
+**Question:** How well does correction using only **partially observed** data perform compared to the oracle?
+
+This compares the **feasible** correction (using partial data) to the **infeasible** correction (using full data).
+
+### Scenario-Specific Performance
+
+```{r table-single-scenario}
+tab_single_scenario <- compute_scenario_stats(res_drop1_raw, tau_true)
+
+tab_single_scenario |>
+    filter(estimator %in% c("Unit-wise Deletion", "Bias-corrected (Infeasible)", "Bias-corrected (Feasible)")) |>
+    select(-mean_bias) |>
+    pivot_wider(names_from = estimator, values_from = rmse) |>
+    kable(digits = 3, caption = "RMSE by Omitted Unit")
+```
+
+```{r fig-scenario-single, fig.width=10, fig.height=6, fig.cap="RMSE by omitted unit showing deletion, oracle, and feasible correction"}
+tab_single_scenario |>
+    filter(estimator %in% c("Unit-wise Deletion", "Bias-corrected (Infeasible)", "Bias-corrected (Feasible)")) |>
+    mutate(estimator = factor(estimator, levels = c("Unit-wise Deletion", "Bias-corrected (Infeasible)", "Bias-corrected (Feasible)"))) |>
+    ggplot(aes(x = missing_var, y = rmse, fill = estimator)) +
+    geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+    scale_fill_manual(values = estimator_colors) +
+    labs(x = "Omitted Unit", y = "RMSE", fill = "Estimator",
+         title = "Part B: RMSE by Omitted Unit") +
+    theme(legend.position = "bottom")
+```
+
+### Gap Recovered
+
+**Gap Recovered** measures what fraction of the deletion bias the feasible correction removes, relative to the oracle:
+
+$$\text{Gap Recovered} = \frac{\text{RMSE}_{\text{deletion}} - \text{RMSE}_{\text{feasible}}}{\text{RMSE}_{\text{deletion}} - \text{RMSE}_{\text{infeasible}}} \times 100\%$$
+
+- **100%** means feasible correction fully matches the oracle
+- **0%** means feasible correction provides no improvement over deletion
+
+```{r table-gap-recovered}
+tab_gap_recovered <- compute_gap_recovered(res_drop1_raw, tau_true)
+tab_gap_recovered |>
+    kable(digits = 3, caption = "Gap Recovered by Feasible Correction")
+```
+
+### Feasible vs Oracle Correction
+
+```{r fig-feasible-vs-oracle, fig.width=8, fig.height=6, fig.cap="Scatter plot comparing feasible correction to oracle correction. Points on the 45-degree line indicate feasible matches oracle."}
+res_drop1_raw |>
+    filter(estimator %in% c("Bias-corrected (Infeasible)", "Bias-corrected (Feasible)")) |>
+    select(id, missing_var, estimator, tau) |>
+    pivot_wider(names_from = estimator, values_from = tau) |>
+    ggplot(aes(x = `Bias-corrected (Infeasible)`, y = `Bias-corrected (Feasible)`)) +
+    geom_point(alpha = 0.3, color = "steelblue") +
+    geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed", linewidth = 1) +
+    labs(x = "Oracle Corrected Estimate (Infeasible)",
+         y = "Feasible Corrected Estimate",
+         title = "Part B: How Close is Feasible to Oracle?") +
+    coord_fixed() +
+    facet_wrap(~ missing_var, ncol = 2)
+```
+
+### Feasible vs Oracle Correlation
+
+```{r table-feasible-oracle-correlation}
+feasible_oracle_corr <- res_drop1_raw |>
+    filter(estimator %in% c("Bias-corrected (Infeasible)", "Bias-corrected (Feasible)")) |>
+    select(id, missing_var, estimator, tau) |>
+    pivot_wider(names_from = estimator, values_from = tau) |>
+    group_by(missing_var) |>
+    summarise(
+        correlation = cor(`Bias-corrected (Infeasible)`, `Bias-corrected (Feasible)`),
+        mean_gap = mean(`Bias-corrected (Feasible)` - `Bias-corrected (Infeasible)`),
+        rmse_gap = sqrt(mean((`Bias-corrected (Feasible)` - `Bias-corrected (Infeasible)`)^2)),
+        .groups = "drop"
+    )
+
+feasible_oracle_corr |>
+    kable(digits = 3, caption = "Feasible vs Oracle: How similar are the corrections?")
+```
+
+# Results: Two Missing Units (k = 2)
+
+## Overall Performance
+
+```{r table-multi-overall}
+tab_multi_overall <- compute_summary_stats(res_drop2_raw, tau_true)
+
+tab_multi_overall |>
+    filter(estimator != "True Effect") |>
+    kable(digits = 3, caption = "Overall Performance: Two Missing Units")
+```
+
+**Note on sample sizes (n):** Complete Observations and Complete gsynth have n=1000 (one per simulation) because they use all data regardless of which units are "missing." Other estimators have n=6000 because there are 6 missing-unit combinations (C(4,2)=6) × 1000 simulations.
+
+**Note on mean_bias vs MAE:** As with k=1, the `mean_bias` may appear near zero due to cancellation across scenarios, while `mae` better captures the typical error magnitude.
+
+## Figure: Distribution of Estimates
+
+```{r fig-boxplot-multi, fig.width=9, fig.height=6, fig.cap="Box plots showing distribution of treatment effect estimates across 1000 simulations (two missing units)"}
+res_drop2_raw |>
+    filter(estimator %in% plot_order) |>
+    mutate(estimator = factor(estimator, levels = rev(plot_order))) |>
+    ggplot(aes(x = estimator, y = tau, fill = estimator)) +
+    geom_boxplot(outlier.alpha = 0.3, show.legend = FALSE) +
+    geom_hline(yintercept = 0, color = "red", linetype = "dashed", linewidth = 1) +
+    coord_flip() +
+    scale_fill_manual(values = estimator_colors) +
+    labs(x = NULL, y = "Treatment Effect Estimate (τ)",
+         title = "Distribution of Estimates: Two Missing Units",
+         subtitle = "Red dashed line = true effect (0)") +
+    theme(axis.text.y = element_text(size = 11))
+```
+
+## Bias-Variance Decomposition by Scenario
+
+```{r fig-bias-variance-k2, fig.width=14, fig.height=6, fig.cap="Bias-variance decomposition of MSE by omitted unit pair scenario (k=2)."}
+# Compute bias-variance by scenario
+bv_by_scenario_k2 <- res_drop2_raw |>
+    filter(estimator %in% c("Unit-wise Deletion", "Bias-corrected (Infeasible)", "Bias-corrected (Feasible)")) |>
+    group_by(estimator, missing_var) |>
+    summarise(
+        mean_bias = mean(tau),
+        bias_sq = mean(tau)^2,
+        variance = var(tau),
+        .groups = "drop"
+    )
+
+# Expand Complete Observations to all scenarios for comparison
+complete_expanded_k2 <- expand.grid(
+    estimator = "Complete Observations",
+    missing_var = unique(bv_by_scenario_k2$missing_var)
+) |>
+    mutate(
+        mean_bias = complete_stats$mean_bias,
+        bias_sq = complete_stats$bias_sq,
+        variance = complete_stats$variance
+    )
+
+bv_all_k2 <- bind_rows(bv_by_scenario_k2, complete_expanded_k2) |>
+    mutate(estimator = factor(estimator,
+           levels = rev(c("Complete Observations", "Unit-wise Deletion",
+                          "Bias-corrected (Infeasible)", "Bias-corrected (Feasible)"))))
+
+bv_all_k2 |>
+    select(estimator, missing_var, `Bias²` = bias_sq, Variance = variance) |>
+    pivot_longer(c(`Bias²`, Variance), names_to = "Component", values_to = "value") |>
+    mutate(Component = factor(Component, levels = c("Variance", "Bias²"))) |>
+    ggplot(aes(x = estimator, y = value, fill = Component)) +
+    geom_col() +
+    coord_flip() +
+    facet_wrap(~ missing_var, nrow = 1) +
+    scale_fill_manual(values = c("Bias²" = "indianred", "Variance" = "steelblue")) +
+    labs(x = NULL, y = "MSE (Bias² + Variance)",
+         title = "Bias-Variance Decomposition by Scenario (k=2)") +
+    theme(legend.position = "bottom",
+          axis.text.y = element_text(size = 8),
+          strip.text = element_text(size = 8))
+```
+
+---
+
+## Part A: Bias Decomposition Validation (k=2)
+
+**Question:** Does the decomposition $\hat{\gamma} \times \hat{\delta}$ accurately capture the actual deletion bias when two units are missing?
+
+### Sensitivity Plot with Oracle Estimates
+
+```{r fig-sensitivity-package-k2, fig.width=9, fig.height=7, fig.cap="Sensitivity plot with mean oracle estimates for each omitted unit pair (k=2)."}
+# Get oracle estimates for k=2
+oracle_data_k2 <- res_drop2_raw |>
+    filter(estimator == "Bias-corrected (Infeasible)") |>
+    select(id, missing_var, gamma, delta, bias_est)
+
+# Compute mean oracle estimates for each omitted unit pair
+oracle_summary_k2 <- oracle_data_k2 |>
+    group_by(missing_var) |>
+    summarise(
+        mean_gamma = mean(gamma),
+        mean_delta = mean(delta),
+        mean_bias = mean(bias_est),
+        .groups = "drop"
+    )
+
+# Use plot_sensitivity from scmsens and add contour labels
+p_k2 <- plot_sensitivity(
+    tau_complete = tau_complete_val,
+    var_x_gamma = oracle_summary_k2$mean_gamma,
+    var_x_delta = oracle_summary_k2$mean_delta,
+    var_x_name = paste0(oracle_summary_k2$missing_var, " (bias=", round(oracle_summary_k2$mean_bias, 2), ")"),
+    title = "Sensitivity Plot: Mean Oracle Estimates (k=2)",
+    repel = TRUE,
+    text_size = 3.5
+)
+
+# Add contour labels using metR
+gamma_seq_k2 <- seq(round(min(oracle_summary_k2$mean_gamma), 0) - 0.5,
+                    round(max(oracle_summary_k2$mean_gamma), 0) + 0.5, length.out = 100)
+delta_seq_k2 <- seq(round(min(oracle_summary_k2$mean_delta), 0) - 0.5,
+                    round(max(oracle_summary_k2$mean_delta), 0) + 0.5, length.out = 100)
+sens_df_k2 <- expand.grid(gamma = gamma_seq_k2, delta = delta_seq_k2) |>
+    mutate(tau_adj = tau_complete_val + gamma * delta)
+
+p_k2 + metR::geom_text_contour(data = sens_df_k2, aes(x = gamma, y = delta, z = tau_adj),
+                               stroke = 0.2, size = 3, skip = 1)
+```
+
+### Decomposition Accuracy
+
+```{r fig-bias-scatter-k2, fig.width=10, fig.height=6, fig.cap="Scatter plot showing actual deletion bias vs estimated bias from the decomposition (k=2)."}
+deletion_data_k2 <- res_drop2_raw |>
+    filter(estimator == "Unit-wise Deletion") |>
+    select(id, missing_var, tau_deletion = tau, tau_complete)
+
+infeasible_data_k2 <- res_drop2_raw |>
+    filter(estimator == "Bias-corrected (Infeasible)") |>
+    select(id, missing_var, bias_est_infeasible = bias_est)
+
+plot_data_A_k2 <- deletion_data_k2 |>
+    left_join(infeasible_data_k2, by = c("id", "missing_var")) |>
+    mutate(actual_deletion_bias = tau_deletion - tau_complete)
+
+ggplot(plot_data_A_k2, aes(x = actual_deletion_bias, y = bias_est_infeasible)) +
+    geom_point(alpha = 0.3, color = "steelblue") +
+    geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed", linewidth = 1) +
+    labs(x = "Actual Deletion Bias (τ_deletion - τ_complete)",
+         y = "Estimated Bias from Decomposition (γ × δ)",
+         title = "Part A: Does the Decomposition Capture Deletion Bias? (k=2)",
+         subtitle = "Using infeasible (oracle) estimates with full data") +
+    coord_fixed() +
+    facet_wrap(~ missing_var, ncol = 3)
+```
+
+### Decomposition Accuracy Statistics
+
+```{r table-decomposition-accuracy-k2}
+decomp_accuracy_k2 <- plot_data_A_k2 |>
+    group_by(missing_var) |>
+    summarise(
+        correlation = cor(actual_deletion_bias, bias_est_infeasible),
+        mean_actual_bias = mean(actual_deletion_bias),
+        mean_estimated_bias = mean(bias_est_infeasible),
+        rmse_decomposition = sqrt(mean((actual_deletion_bias - bias_est_infeasible)^2)),
+        .groups = "drop"
+    )
+
+decomp_accuracy_k2 |>
+    kable(digits = 3, caption = "Decomposition Accuracy (k=2): How well does γ×δ capture actual deletion bias?")
+```
+
+---
+
+## Part B: Feasible Correction Performance (k=2)
+
+**Question:** How well does correction using only **partially observed** data perform compared to the oracle when two units are missing?
+
+### Scenario-Specific Performance
+
+```{r table-multi-scenario}
+tab_multi_scenario <- compute_scenario_stats(res_drop2_raw, tau_true)
+
+tab_multi_scenario |>
+    filter(estimator %in% c("Unit-wise Deletion", "Bias-corrected (Infeasible)", "Bias-corrected (Feasible)")) |>
+    select(-mean_bias) |>
+    pivot_wider(names_from = estimator, values_from = rmse) |>
+    kable(digits = 3, caption = "RMSE by Omitted Unit Pair")
+```
+
+### Scenario-Specific Figure
+
+```{r fig-scenario-multi, fig.width=10, fig.height=6, fig.cap="RMSE comparison across omitted unit pairs (k=2)"}
+tab_multi_scenario |>
+    filter(estimator %in% c("Unit-wise Deletion", "Bias-corrected (Infeasible)", "Bias-corrected (Feasible)")) |>
+    mutate(estimator = factor(estimator, levels = c("Unit-wise Deletion", "Bias-corrected (Infeasible)", "Bias-corrected (Feasible)"))) |>
+    ggplot(aes(x = missing_var, y = rmse, fill = estimator)) +
+    geom_col(position = position_dodge(width = 0.8), width = 0.7) +
+    scale_fill_manual(values = estimator_colors) +
+    labs(x = "Omitted Unit Pair", y = "RMSE", fill = "Estimator",
+         title = "Part B: RMSE by Omitted Unit Pair") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1),
+          legend.position = "bottom")
+```
+
+### Gap Recovered
+
+```{r table-gap-recovered-k2}
+gap_recovered_k2 <- tab_multi_scenario |>
+    filter(estimator %in% c("Unit-wise Deletion", "Bias-corrected (Infeasible)", "Bias-corrected (Feasible)")) |>
+    select(missing_var, estimator, rmse) |>
+    pivot_wider(names_from = estimator, values_from = rmse) |>
+    mutate(
+        deletion_gap = `Unit-wise Deletion` - `Bias-corrected (Infeasible)`,
+        feasible_improvement = `Unit-wise Deletion` - `Bias-corrected (Feasible)`,
+        gap_recovered_pct = feasible_improvement / deletion_gap * 100
+    )
+
+gap_recovered_k2 |>
+    select(missing_var, deletion_gap, feasible_improvement, gap_recovered_pct) |>
+    kable(digits = 1, caption = "Gap Recovered by Feasible Correction (k=2)",
+          col.names = c("Omitted Pair", "Deletion Gap", "Feasible Improvement", "Gap Recovered (%)"))
+```
+
+### Feasible vs Oracle Comparison
+
+```{r fig-feasible-vs-oracle-k2, fig.width=10, fig.height=6, fig.cap="Scatter plot comparing feasible vs oracle corrected estimates (k=2)."}
+res_drop2_raw |>
+    filter(estimator %in% c("Bias-corrected (Infeasible)", "Bias-corrected (Feasible)")) |>
+    select(id, missing_var, estimator, tau) |>
+    pivot_wider(names_from = estimator, values_from = tau) |>
+    ggplot(aes(x = `Bias-corrected (Infeasible)`, y = `Bias-corrected (Feasible)`)) +
+    geom_point(alpha = 0.3, color = "darkgreen") +
+    geom_abline(slope = 1, intercept = 0, color = "red", linetype = "dashed", linewidth = 1) +
+    labs(x = "Oracle Corrected Estimate (Infeasible)",
+         y = "Feasible Corrected Estimate",
+         title = "Part B: How Close is Feasible to Oracle? (k=2)") +
+    coord_fixed() +
+    facet_wrap(~ missing_var, ncol = 3)
+```
+
+### Feasible vs Oracle Correlation
+
+```{r table-feasible-oracle-correlation-k2}
+feasible_oracle_corr_k2 <- res_drop2_raw |>
+    filter(estimator %in% c("Bias-corrected (Infeasible)", "Bias-corrected (Feasible)")) |>
+    select(id, missing_var, estimator, tau) |>
+    pivot_wider(names_from = estimator, values_from = tau) |>
+    group_by(missing_var) |>
+    summarise(
+        correlation = cor(`Bias-corrected (Infeasible)`, `Bias-corrected (Feasible)`),
+        mean_gap = mean(`Bias-corrected (Feasible)` - `Bias-corrected (Infeasible)`),
+        rmse_gap = sqrt(mean((`Bias-corrected (Feasible)` - `Bias-corrected (Infeasible)`)^2)),
+        .groups = "drop"
+    )
+
+feasible_oracle_corr_k2 |>
+    kable(digits = 3, caption = "Feasible vs Oracle (k=2): How similar are the corrections?")
+```
+
+# Summary
+
+```{r summary-stats}
+rmse_complete <- tab_single_overall |> filter(estimator == "Complete Observations") |> pull(rmse)
+rmse_deletion <- tab_single_overall |> filter(estimator == "Unit-wise Deletion") |> pull(rmse)
+rmse_infeasible <- tab_single_overall |> filter(estimator == "Bias-corrected (Infeasible)") |> pull(rmse)
+rmse_feasible <- tab_single_overall |> filter(estimator == "Bias-corrected (Feasible)") |> pull(rmse)
+
+deletion_gap <- rmse_deletion - rmse_infeasible
+feasible_improvement <- rmse_deletion - rmse_feasible
+gap_recovered <- feasible_improvement / deletion_gap * 100
+```
+
+**Key Findings (Single Missing Unit):**
+
+| Metric | Value |
+|--------|-------|
+| Complete Observations RMSE | `r round(rmse_complete, 3)` |
+| Unit-wise Deletion RMSE | `r round(rmse_deletion, 3)` |
+| Bias-corrected (Infeasible) RMSE | `r round(rmse_infeasible, 3)` |
+| Bias-corrected (Feasible) RMSE | `r round(rmse_feasible, 3)` |
+| Deletion gap (deletion - oracle) | `r round(deletion_gap, 3)` |
+| Feasible improvement | `r round(feasible_improvement, 3)` |
+| **Gap recovered by feasible** | **`r round(gap_recovered, 1)`%** |
+
+**Interpretation:**
+
+> The feasible correction removes a substantial portion of deletion bias and approaches the oracle benchmark. This suggests that the proposed decomposition recovers most of the systematic component of deletion bias from partially observed outcomes alone.
+
+---
+
+# Future Extensions
+
+This simulation study uses an augmented-factor IFE design calibrated to the West Germany reunification data. Several extensions could further strengthen the analysis:
+
+**Actual Data Application:**
+
+- Germany leave-one-out decomposition using pseudo-inverse bias decomposition with original pre-treatment periods (no factor augmentation)
+- Time-varying decomposition across all post-treatment years (1990-2003)
+
+**Alternative Estimation Methods:**
+
+- Simplex-constrained SCM weights (original Abadie et al. formulation)
+
+**Full Donor Pool Simulation:**
+
+- Current simulation uses 4 control units (Austria, USA, Japan, UK) — the three largest-weight donors plus one additional
+- Extend to all 16 OECD control units from the original Abadie et al. study for a more comprehensive evaluation
+
+**Robustness to Missingness Patterns:**
+
+- Early-block vs late-block missingness
+- Random missingness patterns
+- Varying proportions of missing data (25%, 50%, 75%)
+
+**Additional Visualizations:**
+
+- IFE-based sensitivity plots incorporating factor uncertainty
+- Donor-specific time paths showing gap recovery (e.g., Japan)
+
+# Session Info
+
+```{r session-info}
+sessionInfo()
+```
