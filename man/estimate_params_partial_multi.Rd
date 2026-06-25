@@ -38,6 +38,11 @@ to fit the regression model. Default is \code{FALSE}.}
 A named list containing:
 \describe{
 \item{gamma}{Always returns 1, as the combined effect is captured in the imbalance.}
+\item{component_gamma}{Named vector of outcome-regression coefficients for each
+partially observed unit.}
+\item{component_delta}{Named vector of post-treatment prediction errors for each
+partially observed unit.}
+\item{component_bias}{Named vector of component-wise gamma times delta values.}
 \item{imbalance}{The combined imbalance (prediction error) for all partially
 observed units, weighted by their coefficients.}
 \item{bias}{The estimated bias from excluding these control units.}

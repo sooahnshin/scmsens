@@ -4,12 +4,17 @@
 \alias{lm_pseudo}
 \title{Fitting Linear Models Using Pseudo-inverse}
 \usage{
-lm_pseudo(formula, data)
+lm_pseudo(formula, data, tol = get_pseudo_inverse_tol())
 }
 \arguments{
 \item{formula}{A string to specify the linear model.}
 
 \item{data}{A data.frame containing the data.}
+
+\item{tol}{Relative singular-value tolerance. Singular values less than
+\code{tol * max(singular_values)} are dropped from the pseudo-inverse. Defaults
+to \code{getOption("scmsens.pseudo_inverse_tol")}, then \code{SCMSENS_PINV_TOL}, then
+\code{1e-6}.}
 }
 \value{
 A list containing the estimated coefficients.

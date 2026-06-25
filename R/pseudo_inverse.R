@@ -4,6 +4,10 @@
 #'
 #' @param formula A string to specify the linear model.
 #' @param data A data.frame containing the data.
+#' @param tol Relative singular-value tolerance. Singular values less than
+#'   `tol * max(singular_values)` are dropped from the pseudo-inverse. Defaults
+#'   to `getOption("scmsens.pseudo_inverse_tol")`, then `SCMSENS_PINV_TOL`, then
+#'   `1e-6`.
 #' @return A list containing the estimated coefficients.
 #'
 #' @importFrom stats model.matrix model.response model.frame
@@ -13,24 +17,46 @@
 #' @export
 #'
 #' @seealso [summary.lm_pseudo()], [predict.lm_pseudo()], [coef.lm_pseudo()], [tidy.lm_pseudo()]
-lm_pseudo <- function(formula, data) {
+lm_pseudo <- function(formula, data, tol = get_pseudo_inverse_tol()) {
   X <- model.matrix(formula, data)
   y <- model.response(model.frame(formula, data))
-  # Compute pseudoinverse of X
-  X_pinv <- MASS::ginv(X)
+  svd_X <- svd(X)
+  keep <- svd_X$d > tol * max(svd_X$d)
 
-  # Compute coefficients using pseudoinverse
-  beta_hat <- X_pinv %*% y
+  beta_hat <- rep(0, ncol(X))
+  if (any(keep)) {
+    beta_hat <- svd_X$v[, keep, drop = FALSE] %*%
+      ((t(svd_X$u[, keep, drop = FALSE]) %*% y) / svd_X$d[keep])
+  }
 
   res <- list(
     summary = tibble(term = colnames(X), estimate = as.numeric(beta_hat)),
     formula = formula,
-    data = data
+    data = data,
+    tol = tol,
+    singular_values = svd_X$d,
+    rank = sum(keep)
   )
 
   class(res) <- "lm_pseudo"
 
   return(res)
+}
+
+get_pseudo_inverse_tol <- function() {
+  option_tol <- getOption("scmsens.pseudo_inverse_tol", NULL)
+  env_tol <- Sys.getenv("SCMSENS_PINV_TOL", unset = NA_character_)
+  tol <- if (!is.null(option_tol)) {
+    option_tol
+  } else if (!is.na(env_tol) && nzchar(env_tol)) {
+    as.numeric(env_tol)
+  } else {
+    1e-6
+  }
+  if (!is.numeric(tol) || length(tol) != 1 || is.na(tol) || tol < 0) {
+    stop("Pseudo-inverse tolerance must be a non-negative number.", call. = FALSE)
+  }
+  tol
 }
 
 #' Summary Method for lm_pseudo Objects

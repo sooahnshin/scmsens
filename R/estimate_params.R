@@ -279,6 +279,19 @@ estimate_params_partial <- function(
 
   # variable with missing
   var_z_name <- all.vars(as.formula(fm_z_on_x))[1]
+  all_vars <- unique(c(all.vars(as.formula(fm_z_on_x)), all.vars(as.formula(fm_y_on_z_and_x))))
+  missing_pre <- setdiff(all_vars, names(data_pre))
+  if (length(missing_pre) > 0) {
+    stop("The following columns are missing from 'data_pre': ",
+         paste(missing_pre, collapse = ", "), ".",
+         call. = FALSE)
+  }
+  missing_post <- setdiff(all_vars, names(data_post))
+  if (length(missing_post) > 0) {
+    stop("The following columns are missing from 'data_post': ",
+         paste(missing_post, collapse = ", "), ".",
+         call. = FALSE)
+  }
 
   # convert to formula
   fm_z_on_x <- as.formula(fm_z_on_x)
@@ -357,6 +370,11 @@ estimate_params_partial <- function(
 #' @return A named list containing:
 #' \describe{
 #'   \item{gamma}{Always returns 1, as the combined effect is captured in the imbalance.}
+#'   \item{component_gamma}{Named vector of outcome-regression coefficients for each
+#'     partially observed unit.}
+#'   \item{component_delta}{Named vector of post-treatment prediction errors for each
+#'     partially observed unit.}
+#'   \item{component_bias}{Named vector of component-wise gamma times delta values.}
 #'   \item{imbalance}{The combined imbalance (prediction error) for all partially
 #'     observed units, weighted by their coefficients.}
 #'   \item{bias}{The estimated bias from excluding these control units.}
@@ -458,6 +476,30 @@ estimate_params_partial_multi <- function(
     )
   }
   gamma <- coef(fit_yzx)[names(coef(fit_yzx)) %in% var_z_name]
+  component_delta <- purrr::map_dbl(var_z_name, function(z_name) {
+    fm_z_on_x_component <- paste(z_name, "~ -1 +", paste(var_x_name, collapse = "+"))
+    fm_z_on_x_component <- as.formula(fm_z_on_x_component)
+
+    if (isTRUE(pseudo_inverse)) {
+      fit_zx_component <- lm_pseudo(
+        fm_z_on_x_component,
+        data = data_pre
+      )
+    } else {
+      fit_zx_component <- lm(
+        fm_z_on_x_component,
+        data = data_pre
+      )
+    }
+
+    pred_zT_component <- predict(fit_zx_component, newdata = data_post)
+    obs_zT_component <- data_post[1, z_name]
+    as.numeric(obs_zT_component - pred_zT_component)
+  })
+  names(component_delta) <- var_z_name
+  component_gamma <- gamma[var_z_name]
+  names(component_gamma) <- var_z_name
+  component_bias <- component_gamma * component_delta
 
   # make new single Z variable that is a linear combination of missing variables with weights being gamma
   data_pre_aug <- data_pre
@@ -488,6 +530,9 @@ estimate_params_partial_multi <- function(
   return(
     list(
       gamma = 1,
+      component_gamma = component_gamma,
+      component_delta = component_delta,
+      component_bias = component_bias,
       imbalance = as.numeric(imbalance),
       bias = as.numeric(imbalance)
     )
