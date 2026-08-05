@@ -25,6 +25,7 @@ Imports:
     MASS,
     metR,
     purrr,
+    quadprog,
     sensemakr,
     tibble,
     tidyselect
